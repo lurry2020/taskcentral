@@ -1,0 +1,181 @@
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import {
+  BellRing,
+  FileCode2,
+  LayoutDashboard,
+  ListChecks,
+  LogOut,
+  Menu,
+  Plus,
+  Server,
+  Settings,
+  X,
+} from "lucide-react";
+import { cn, setAppTimeZone } from "@/lib/utils";
+import { useSettings } from "@/lib/queries";
+import { useAuth } from "@/lib/auth";
+import { Button } from "@/components/ui/Button";
+import { ChatWidget } from "@/components/chat/ChatWidget";
+
+const navItems = [
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/inventory", label: "Inventory", icon: Server },
+  { to: "/task-templates", label: "Task Templates", icon: ListChecks },
+  { to: "/reminder-templates", label: "Reminder Templates", icon: BellRing },
+  { to: "/obsidian-templates", label: "Obsidian Templates", icon: FileCode2 },
+  { to: "/settings", label: "Settings", icon: Settings },
+];
+
+function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <nav className="flex flex-col gap-0.5 px-3" aria-label="Main navigation">
+      {navItems.map(({ to, label, icon: Icon, end }) => (
+        <NavLink
+          key={to}
+          to={to}
+          end={end ?? to === "/inventory"}
+          onClick={onNavigate}
+          className={({ isActive }) =>
+            cn(
+              "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[0.83rem] font-medium transition-colors",
+              isActive
+                ? "bg-fill text-text"
+                : "text-muted hover:bg-fill-hover hover:text-text",
+            )
+          }
+        >
+          {({ isActive }) => (
+            <>
+              <span
+                className={cn(
+                  "absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-accent transition-opacity",
+                  isActive ? "opacity-100" : "opacity-0",
+                )}
+                aria-hidden
+              />
+              <Icon
+                className={cn(
+                  "h-4 w-4 shrink-0 transition-colors",
+                  isActive ? "text-accent" : "text-faint group-hover:text-muted",
+                )}
+                aria-hidden
+              />
+              {label}
+            </>
+          )}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+function Brand() {
+  const { data: settings } = useSettings();
+  return (
+    <div className="flex items-center gap-3 px-5 py-5">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-b from-accent to-accent-deep text-white shadow-[0_1px_0_0_#ffffff33_inset,0_4px_12px_-4px_var(--color-accent)]">
+        <ListChecks className="h-4.5 w-4.5" aria-hidden />
+      </div>
+      <div className="leading-tight">
+        <p className="text-[0.9rem] font-semibold tracking-tight">
+          {settings?.app_name ?? "Task Central"}
+        </p>
+        <p className="text-[11px] tracking-wide text-faint">Homelab provisioning</p>
+      </div>
+    </div>
+  );
+}
+
+export function Layout() {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const navigate = useNavigate();
+  const { data: settings } = useSettings();
+  const { username, logout } = useAuth();
+
+  // Keep the app-wide display timezone in sync with the backend setting.
+  useEffect(() => {
+    if (settings?.timezone) setAppTimeZone(settings.timezone);
+  }, [settings?.timezone]);
+
+  return (
+    <div className="flex min-h-screen">
+      {/* Desktop sidebar */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-border bg-surface/40 backdrop-blur-xl lg:flex">
+        <Brand />
+        <NavLinks />
+        <div className="mt-auto border-t border-border px-3 py-3">
+          <button
+            onClick={logout}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[0.83rem] font-medium text-muted transition-colors hover:bg-fill-hover hover:text-text"
+          >
+            <LogOut className="h-4 w-4 shrink-0 text-faint" aria-hidden />
+            <span className="min-w-0 flex-1 truncate text-left">Sign out</span>
+            {username && <span className="truncate text-[11px] text-faint">{username}</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* Mobile drawer */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true">
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setDrawerOpen(false)}
+            aria-hidden
+          />
+          <aside className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-border bg-surface shadow-2xl">
+            <div className="flex items-center justify-between pr-3">
+              <Brand />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setDrawerOpen(false)}
+                aria-label="Close navigation"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <NavLinks onNavigate={() => setDrawerOpen(false)} />
+          </aside>
+        </div>
+      )}
+
+      <div className="flex min-w-0 flex-1 flex-col lg:pl-60">
+        {/* Header */}
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-bg/70 px-4 backdrop-blur-xl sm:px-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Open navigation"
+          >
+            <Menu className="h-4.5 w-4.5" />
+          </Button>
+          <div id="page-header-slot" className="min-w-0 flex-1" />
+          <Button variant="primary" size="sm" onClick={() => navigate("/inventory/new")}>
+            <Plus className="h-3.5 w-3.5" aria-hidden />
+            <span className="hidden sm:inline">New Machine</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={logout}
+            aria-label="Sign out"
+            title="Sign out"
+          >
+            <LogOut className="h-4.5 w-4.5" />
+          </Button>
+        </header>
+        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          <div className="mx-auto w-full max-w-6xl">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+      <ChatWidget />
+    </div>
+  );
+}

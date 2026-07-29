@@ -1,0 +1,182 @@
+name: Publish release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Verify release version
+        run: |
+          release_version="${GITHUB_REF_NAME#v}"
+          test "$(tr -d '[:space:]' < VERSION)" = "$release_version"
+      - name: Test backend
+        run: |
+          pip install -r backend/requirements-dev.txt
+          cd backend
+          python -m pytest tests -q
+      - name: Test and build frontend
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm test
+          npm run build
+      - name: Validate release files
+        run: |
+          bash -n release/*.sh scripts/*.sh
+          bash scripts/test-release-bundle.sh
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Prepare release metadata
+        id: release
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          prefix="ghcr.io/$owner"
+          {
+            echo "version=$version"
+            echo "owner=$owner"
+            echo "prefix=$prefix"
+            echo "backend_image=$prefix/taskcentral-backend"
+            echo "frontend_image=$prefix/taskcentral-frontend"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build and publish backend image
+        id: backend
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: backend/Dockerfile.release
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: TASKCENTRAL_VERSION=${{ steps.release.outputs.version }}
+          tags: |
+            ${{ steps.release.outputs.backend_image }}:${{ steps.release.outputs.version }}
+            ${{ steps.release.outputs.backend_image }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.release.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=taskcentral-backend
+          cache-to: type=gha,mode=max,scope=taskcentral-backend
+
+      - name: Attest backend image
+        uses: actions/attest@v4
+        with:
+          subject-name: ${{ steps.release.outputs.backend_image }}
+          subject-digest: ${{ steps.backend.outputs.digest }}
+          push-to-registry: true
+
+      - name: Build and publish frontend image
+        id: frontend
+        uses: docker/build-push-action@v7
+        with:
+          context: frontend
+          file: frontend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.release.outputs.frontend_image }}:${{ steps.release.outputs.version }}
+            ${{ steps.release.outputs.frontend_image }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.release.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=taskcentral-frontend
+          cache-to: type=gha,mode=max,scope=taskcentral-frontend
+
+      - name: Attest frontend image
+        uses: actions/attest@v4
+        with:
+          subject-name: ${{ steps.release.outputs.frontend_image }}
+          subject-digest: ${{ steps.frontend.outputs.digest }}
+          push-to-registry: true
+
+      - name: Build installation bundle
+        shell: bash
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          IMAGE_PREFIX: ${{ steps.release.outputs.prefix }}
+        run: |
+          bundle_name="taskcentral-$VERSION"
+          bundle_dir="release-dist/$bundle_name"
+          mkdir -p "$bundle_dir"
+          cp \
+            release/compose.yml \
+            release/.env.example \
+            release/_common.sh \
+            release/install.sh \
+            release/update.sh \
+            release/backup.sh \
+            release/restore.sh \
+            release/uninstall.sh \
+            release/README.md \
+            MANUAL.md \
+            "$bundle_dir/"
+          cp release/VERSION "$bundle_dir/VERSION"
+          sed -i \
+            -e "s|__VERSION__|$VERSION|g" \
+            -e "s|__IMAGE_PREFIX__|$IMAGE_PREFIX|g" \
+            -e "s|__REPOSITORY__|$GITHUB_REPOSITORY|g" \
+            "$bundle_dir/.env.example" \
+            "$bundle_dir/VERSION"
+          chmod 755 "$bundle_dir"/*.sh
+          tar -C release-dist -czf "release-dist/$bundle_name.tar.gz" "$bundle_name"
+          printf '%s\n' "$VERSION" > release-dist/VERSION
+          (
+            cd release-dist
+            sha256sum "$bundle_name.tar.gz" VERSION > SHA256SUMS
+          )
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "release-dist/taskcentral-$VERSION.tar.gz" \
+            release-dist/VERSION \
+            release-dist/SHA256SUMS \
+            --verify-tag \
+            --generate-notes \
+            --title "Task Central $VERSION"

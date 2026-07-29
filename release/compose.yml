@@ -1,0 +1,52 @@
+services:
+  backend:
+    image: ${TASKCENTRAL_IMAGE_PREFIX}/taskcentral-backend:${TASKCENTRAL_VERSION}
+    restart: unless-stopped
+    environment:
+      APP_NAME: ${APP_NAME:-Task Central}
+      APP_ENV: production
+      DATABASE_URL: sqlite:////data/taskcentral.db
+      DATA_DIR: /data
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8484}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SECRET_KEY: ${SECRET_KEY}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      AUTH_USERNAME: ${AUTH_USERNAME:-admin}
+      AUTH_PASSWORD: ${AUTH_PASSWORD}
+      AUTH_TOKEN_TTL_HOURS: ${AUTH_TOKEN_TTL_HOURS:-168}
+    volumes:
+      - ./data:/data
+      - ./backups:/backups
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=4)",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  frontend:
+    image: ${TASKCENTRAL_IMAGE_PREFIX}/taskcentral-frontend:${TASKCENTRAL_VERSION}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-8484}:80"
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3

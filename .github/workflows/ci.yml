@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements-dev.txt
+      - name: Run backend tests
+        working-directory: backend
+        run: python -m pytest tests -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+      - name: Type-check
+        working-directory: frontend
+        run: npm run typecheck
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+  release-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate shell scripts
+        run: |
+          bash -n release/*.sh scripts/*.sh
+          bash scripts/test-release-bundle.sh
+      - name: Validate release Compose file
+        run: |
+          cp release/.env.example release/.env
+          sed -i \
+            -e 's|__VERSION__|1.0.0|g' \
+            -e 's|__IMAGE_PREFIX__|ghcr.io/example|g' \
+            -e 's|__REPOSITORY__|example/taskcentral|g' \
+            -e 's|__GENERATE__|test-only-secret|g' \
+            release/.env
+          docker compose --env-file release/.env -f release/compose.yml config --quiet
+          rm release/.env
