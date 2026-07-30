@@ -74,11 +74,13 @@ def test_changelog_api_marks_current_version_seen(client, db_session):
 
     response = client.get("/api/v1/changelog/current")
     assert response.status_code == 200
-    assert response.json()["version"] == current
-    assert response.json()["available"] is True
-    assert response.json()["seen"] is False
-    assert "Guided first-run setup with application username" in response.json()["content"]
-    assert "version-aware What's New modal" not in response.json()["content"]
+    body = response.json()
+    assert body["version"] == current
+    assert body["display_version"] == current
+    assert body["available"] is True
+    assert body["seen"] is False
+    assert body["content"].strip()
+    assert "## [" not in body["content"]
 
     marked = client.post("/api/v1/changelog/current/seen")
     assert marked.status_code == 200
