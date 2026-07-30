@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     app_name: str = "Task Central"
     app_env: str = "development"
-    taskcentral_version: str = "1.1.0"
+    taskcentral_version: str = "1.1.1"
     changelog_path: str = ""
     database_url: str = ""
     cors_origins: str = "http://localhost:5173,http://localhost:8484"

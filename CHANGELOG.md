@@ -7,6 +7,21 @@ displays only the section that belongs to its running version.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-07-30
+
+### Changed
+
+- Updates are now one command: `./update.sh` downloads and verifies the new release bundle,
+  refreshes its own management files, pulls the pinned images, backs up the database, and applies
+  the update.
+- Added a standalone `taskcentral-update.sh` release asset that upgrades older installations whose
+  original updater cannot refresh release files.
+
+### Fixed
+
+- Failed updates now restore the previous release-management files along with the prior version
+  and pre-update database.
+
 ## [1.1.0] - 2026-07-30
 
 ### Added

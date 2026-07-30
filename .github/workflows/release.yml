@@ -147,6 +147,7 @@ jobs:
             release/_common.sh \
             release/install.sh \
             release/update.sh \
+            release/taskcentral-update.sh \
             release/backup.sh \
             release/restore.sh \
             release/uninstall.sh \
@@ -164,9 +165,10 @@ jobs:
           chmod 755 "$bundle_dir"/*.sh
           tar -C release-dist -czf "release-dist/$bundle_name.tar.gz" "$bundle_name"
           printf '%s\n' "$VERSION" > release-dist/VERSION
+          cp release/taskcentral-update.sh release-dist/taskcentral-update.sh
           (
             cd release-dist
-            sha256sum "$bundle_name.tar.gz" VERSION > SHA256SUMS
+            sha256sum "$bundle_name.tar.gz" VERSION taskcentral-update.sh > SHA256SUMS
           )
 
       - name: Create GitHub release
@@ -178,6 +180,7 @@ jobs:
             "release-dist/taskcentral-$VERSION.tar.gz" \
             release-dist/VERSION \
             release-dist/SHA256SUMS \
+            release-dist/taskcentral-update.sh \
             --verify-tag \
             --generate-notes \
             --title "Task Central $VERSION"

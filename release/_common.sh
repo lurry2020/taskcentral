@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+RELEASE_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+SCRIPT_DIR="${TASKCENTRAL_INSTALL_DIR:-$RELEASE_SCRIPT_DIR}"
+SCRIPT_DIR="$(cd -- "$SCRIPT_DIR" && pwd -P)"
 COMPOSE_FILE="$SCRIPT_DIR/compose.yml"
 ENV_FILE="$SCRIPT_DIR/.env"
 ENV_TEMPLATE="$SCRIPT_DIR/.env.example"

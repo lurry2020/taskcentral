@@ -40,11 +40,21 @@ Install a specific release:
 ./update.sh 1.2.3
 ```
 
-An update downloads the new images before downtime, creates an online SQLite backup, changes the
-pinned image version, starts the new containers, applies database migrations, and waits for health
-checks. If startup fails, it automatically restores both the previous version and the pre-update
-database. After the next login and Dashboard visit, Task Central shows that version's release notes
-once. Use the **Changelog** button at the bottom of the sidebar to reopen them later.
+The updater downloads and verifies the new release bundle, refreshes its own Compose files,
+management scripts, and documentation, downloads the new images before downtime, and creates an
+online SQLite backup. It then pins the new image version, starts the containers, applies database
+migrations, and waits for health checks. If startup fails, it automatically restores the previous
+release files, version, and pre-update database.
+
+Installations created before the self-refreshing updater can run this one-command bridge from their
+existing installation directory:
+
+```bash
+curl -fsSL https://github.com/lurry2020/taskcentral/releases/latest/download/taskcentral-update.sh | bash
+```
+
+After the next login and Dashboard visit, Task Central shows that version's release notes once.
+Use the **Changelog** button at the bottom of the sidebar to reopen them later.
 
 ## Back up and restore
 

@@ -119,9 +119,19 @@ local compiler.
 ./uninstall.sh                                   # preserve data and configuration
 ```
 
-Updates pull images before downtime, create a database backup, run migrations, and verify both
-health checks. A failed update automatically restores the previous version and database. After a
-successful update, the Dashboard presents the current version's changelog once.
+`./update.sh` also downloads and verifies the new release bundle, so Compose files, management
+scripts, documentation, and container images update together. It creates a database backup before
+downtime and verifies both health checks. A failed update automatically restores the previous
+release files, version, and database.
+
+Installations created before the self-refreshing updater can use this one-command bridge from their
+existing installation directory:
+
+```bash
+curl -fsSL https://github.com/lurry2020/taskcentral/releases/latest/download/taskcentral-update.sh | bash
+```
+
+After a successful update, the Dashboard presents the current version's changelog once.
 
 See the README inside the release bundle for full operational instructions.
 
@@ -253,8 +263,8 @@ To publish:
 
 ```bash
 # Example: publish the version recorded in VERSION.
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.1.1
+git push origin v1.1.1
 ```
 
 The tag must match the root `VERSION` file. The release workflow tests the backend and frontend,

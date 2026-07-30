@@ -1628,15 +1628,27 @@ Or install a specific version:
 ./update.sh 1.2.3
 ```
 
+Installations created before the self-refreshing updater can run this one-command bridge from the
+existing installation directory:
+
+```bash
+curl -fsSL https://github.com/lurry2020/taskcentral/releases/latest/download/taskcentral-update.sh | bash
+```
+
+After that bridge completes, future releases use the normal `./update.sh` command.
+
 The updater:
 
 1. Discovers or validates the requested version.
-2. Pulls the new images before downtime.
-3. Creates a consistent online SQLite backup.
-4. Changes the pinned image version.
-5. Recreates the services; Alembic applies migrations at backend startup.
-6. Waits for backend and frontend health checks.
-7. If health checks fail, restores the previous image version and pre-update database.
+2. Downloads the versioned release bundle and verifies its SHA-256 checksum.
+3. Pulls the new images before downtime.
+4. Creates a consistent online SQLite backup.
+5. Refreshes Compose files, management scripts, documentation, and release metadata.
+6. Changes the pinned image version.
+7. Recreates the services; Alembic applies migrations at backend startup.
+8. Waits for backend and frontend health checks.
+9. If health checks fail, restores the previous release files, image version, and pre-update
+   database.
 
 Never interrupt an update while it is restoring a failed deployment. The pre-update backup remains
 under `backups/` after success.
