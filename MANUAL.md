@@ -254,13 +254,18 @@ docker compose exec backend python -m app.cli setpassword 'NewPassw0rd!'
 ```
 
 The CLI stores a salted PBKDF2 password hash in the application database. This database override
-takes effect for new logins immediately and takes precedence over `AUTH_PASSWORD`.
+takes effect for new logins immediately and takes precedence over `AUTH_PASSWORD`. The CLI reads
+the username selected during setup for its prompt and status message. Changing a password never
+changes that username.
 
 To remove the database override and return to the environment/default password:
 
 ```bash
 docker compose exec backend python -m app.cli setpassword --reset
 ```
+
+The `--reset` option clears only the database password override. It does not remove or replace the
+setup-selected username; that username remains paired with the `AUTH_PASSWORD` fallback.
 
 Changing the password does not revoke already-issued session tokens. Change `SECRET_KEY` and
 restart the backend if all existing tokens must be invalidated.

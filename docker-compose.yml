@@ -6,7 +6,7 @@ services:
     environment:
       APP_NAME: ${APP_NAME:-Task Central}
       APP_ENV: ${APP_ENV:-production}
-      TASKCENTRAL_VERSION: ${TASKCENTRAL_VERSION:-1.1.1}
+      TASKCENTRAL_VERSION: ${TASKCENTRAL_VERSION:-1.1.2}
       CHANGELOG_PATH: /app/CHANGELOG.md
       DATABASE_URL: ${DATABASE_URL:-sqlite:////data/taskcentral.db}
       DATA_DIR: /data

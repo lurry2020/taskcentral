@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from types import SimpleNamespace
 
 from app.config import get_settings
 from app.main import app
@@ -86,6 +87,40 @@ def test_cli_setpassword_changes_login(db_session):
     assert check_credentials(db, "HOMELAB-ADMIN", DEFAULT_PASSWORD) is True
     assert check_credentials(db, DEFAULT_USERNAME, DEFAULT_PASSWORD) is False
     db.close()
+
+
+def test_cli_command_preserves_setup_username(db_session, monkeypatch, capsys):
+    import app.cli as cli
+    from app.services.auth import (
+        check_credentials,
+        get_login_username,
+        get_stored_password_hash,
+        set_login_username,
+    )
+
+    db = db_session()
+    set_login_username(db, "jaxraven")
+    db.commit()
+    db.close()
+    monkeypatch.setattr(cli, "SessionLocal", db_session)
+
+    assert cli._cmd_setpassword(SimpleNamespace(reset=False, password="new-secure-pass")) == 0
+    db = db_session()
+    assert get_login_username(db) == "jaxraven"
+    assert check_credentials(db, "jaxraven", "new-secure-pass") is True
+    db.close()
+    assert "Password for 'jaxraven' updated." in capsys.readouterr().out
+
+    assert cli._cmd_setpassword(SimpleNamespace(reset=True, password=None)) == 0
+    db = db_session()
+    assert get_login_username(db) == "jaxraven"
+    assert get_stored_password_hash(db) is None
+    assert check_credentials(db, "jaxraven", DEFAULT_PASSWORD) is True
+    assert check_credentials(db, DEFAULT_USERNAME, DEFAULT_PASSWORD) is False
+    db.close()
+    output = capsys.readouterr().out
+    assert "Password override for 'jaxraven' cleared" in output
+    assert "The username was not changed." in output
 
 
 def test_password_hash_excluded_from_export(client, db_session):

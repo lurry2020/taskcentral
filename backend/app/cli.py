@@ -10,22 +10,22 @@ import argparse
 import getpass
 import sys
 
-from app.config import get_settings
 from app.database import SessionLocal
-from app.services.auth import clear_password, set_password
+from app.services.auth import clear_password, get_login_username, set_password
 
 
 def _cmd_setpassword(args: argparse.Namespace) -> int:
-    username = get_settings().auth_username
     db = SessionLocal()
     try:
+        username = get_login_username(db)
         if args.reset:
             cleared = clear_password(db)
             db.commit()
             print(
-                "Password override cleared — login now uses the AUTH_PASSWORD env/default."
+                f"Password override for '{username}' cleared — login now uses the "
+                "AUTH_PASSWORD env/default. The username was not changed."
                 if cleared
-                else "No password override was set; nothing to clear."
+                else f"No password override was set for '{username}'; nothing to clear."
             )
             return 0
 

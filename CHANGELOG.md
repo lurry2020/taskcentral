@@ -7,6 +7,13 @@ displays only the section that belongs to its running version.
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-07-30
+
+### Fixed
+
+- The password-reset CLI now resolves and reports the setup-selected username instead of displaying
+  the `AUTH_USERNAME` fallback. Password changes and `--reset` preserve the stored username.
+
 ## [1.1.1] - 2026-07-30
 
 ### Changed

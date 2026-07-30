@@ -263,8 +263,8 @@ To publish:
 
 ```bash
 # Example: publish the version recorded in VERSION.
-git tag v1.1.1
-git push origin v1.1.1
+git tag v1.1.2
+git push origin v1.1.2
 ```
 
 The tag must match the root `VERSION` file. The release workflow tests the backend and frontend,
@@ -313,7 +313,8 @@ docker compose exec backend python -m app.cli setpassword --reset
 
 The new password is stored (salted PBKDF2 hash) in the database and takes effect immediately for
 new logins — no restart needed. It overrides `AUTH_PASSWORD` until you `--reset`. The hash is
-never included in JSON data exports.
+never included in JSON data exports. Both forms preserve the username selected during setup;
+`--reset` clears only the stored password override.
 
 ## Security considerations
 
