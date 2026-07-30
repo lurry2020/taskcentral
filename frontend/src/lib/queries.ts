@@ -3,6 +3,8 @@ import { api } from "./api";
 import type {
   ActivityEvent,
   AppSettings,
+  ChangelogSeen,
+  CurrentChangelog,
   DashboardData,
   Dependency,
   DependencyInput,
@@ -10,6 +12,7 @@ import type {
   GeneratedDocumentListItem,
   ImportResult,
   Machine,
+  MachineConnectivity,
   MachineListItem,
   MachineReminder,
   MachineTask,
@@ -56,6 +59,26 @@ function qs(params: Record<string, unknown>): string {
 export const useDashboard = () =>
   useQuery({ queryKey: ["dashboard"], queryFn: () => api.get<DashboardData>("/dashboard") });
 
+export const useCurrentChangelog = () =>
+  useQuery({
+    queryKey: ["changelog-current"],
+    queryFn: () => api.get<CurrentChangelog>("/changelog/current"),
+    staleTime: Infinity,
+  });
+
+export function useMarkCurrentChangelogSeen() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<ChangelogSeen>("/changelog/current/seen"),
+    onSuccess: () => {
+      queryClient.setQueryData<CurrentChangelog>(
+        ["changelog-current"],
+        (current) => (current ? { ...current, seen: true } : current),
+      );
+    },
+  });
+}
+
 export const useMachines = (params: MachineListParams) =>
   useQuery({
     queryKey: ["machines", params],
@@ -67,6 +90,16 @@ export const useMachine = (id: number | undefined) =>
     queryKey: ["machine", id],
     queryFn: () => api.get<Machine>(`/machines/${id}`),
     enabled: id !== undefined,
+  });
+
+export const useMachineConnectivity = (id: number | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ["machine-connectivity", id],
+    queryFn: () => api.get<MachineConnectivity>(`/machines/${id}/connectivity`),
+    enabled: id !== undefined && enabled,
+    refetchInterval: 30_000,
+    staleTime: 10_000,
+    retry: false,
   });
 
 export const useHosts = () =>

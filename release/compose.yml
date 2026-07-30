@@ -5,10 +5,15 @@ services:
     environment:
       APP_NAME: ${APP_NAME:-Task Central}
       APP_ENV: production
+      TASKCENTRAL_VERSION: ${TASKCENTRAL_VERSION}
+      CHANGELOG_PATH: /app/CHANGELOG.md
       DATABASE_URL: sqlite:////data/taskcentral.db
       DATA_DIR: /data
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8484}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_DIR: /logs
+      LOG_MAX_BYTES: ${LOG_MAX_BYTES:-5242880}
+      LOG_BACKUP_COUNT: ${LOG_BACKUP_COUNT:-5}
       SECRET_KEY: ${SECRET_KEY}
       DEMO_MODE: ${DEMO_MODE:-false}
       AUTH_USERNAME: ${AUTH_USERNAME:-admin}
@@ -17,6 +22,7 @@ services:
     volumes:
       - ./data:/data
       - ./backups:/backups
+      - ./logs:/logs
     extra_hosts:
       - "host.docker.internal:host-gateway"
     security_opt:
@@ -42,6 +48,11 @@ services:
         condition: service_healthy
     ports:
       - "${APP_PORT:-8484}:80"
+    environment:
+      FRONTEND_LOG_MAX_BYTES: ${LOG_MAX_BYTES:-5242880}
+      FRONTEND_LOG_BACKUP_COUNT: ${LOG_BACKUP_COUNT:-5}
+    volumes:
+      - ./logs:/logs
     security_opt:
       - no-new-privileges:true
     healthcheck:

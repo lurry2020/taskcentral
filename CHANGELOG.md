@@ -2,7 +2,29 @@
 
 All notable changes to Task Central releases are documented here.
 
-The format follows Keep a Changelog, and release numbers use Semantic Versioning.
+The format follows Keep a Changelog, and release numbers use Semantic Versioning. The application
+displays only the section that belongs to its running version.
+
+## [Unreleased]
+
+## [1.1.0] - 2026-07-30
+
+### Added
+
+- Local AI model dropdowns on the Setup and Settings pages, populated from the models installed on
+  the configured local AI server.
+- An Online or Offline indicator in each machine detail header, backed by an ICMP ping to the
+  machine's IP address. Hovering over the indicator displays the ping details.
+- Persistent rotating application logs inside the Task Central project directory. Backend logs are
+  written to `logs/taskcentral.log`, and frontend/nginx logs are written to `logs/frontend.log`.
+- A version-aware What's New modal that appears once after an update, plus a sidebar Changelog
+  button for viewing the current version's notes again.
+- A resizable Local AI chat window whose selected size and open or minimized state persist across
+  page navigation.
+
+### Changed
+
+- Removed the Active, In Progress, and Maintenance status badge from the machine detail header.
 
 ## [1.0.0]
 

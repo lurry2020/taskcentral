@@ -32,6 +32,10 @@ one-click Obsidian-ready Markdown document for your vault.
   only from the archive view.
 - **First-run setup wizard** — creates the login username and password and configures general
   preferences, Telegram, and optional local AI before the first login.
+- **Machine reachability** — machine detail headers ping the stored IP from the backend and show
+  Online or Offline with manual refresh, hover details, and periodic checks.
+- **Version-aware changelog** — after an update, the Dashboard shows the current release notes
+  once automatically; the sidebar Changelog button reopens them at any time.
 
 ## Screenshots
 
@@ -77,6 +81,7 @@ _(add screenshots here)_
 │   └── Dockerfile
 ├── data/                  # SQLite database (persistent volume)
 ├── release/               # End-user Compose bundle and lifecycle scripts
+├── CHANGELOG.md           # Versioned release notes shown inside the application
 ├── .github/workflows/     # CI and multi-architecture release publishing
 ├── VERSION                # Current application release
 ├── docker-compose.yml
@@ -115,7 +120,8 @@ local compiler.
 ```
 
 Updates pull images before downtime, create a database backup, run migrations, and verify both
-health checks. A failed update automatically restores the previous version and database.
+health checks. A failed update automatically restores the previous version and database. After a
+successful update, the Dashboard presents the current version's changelog once.
 
 See the README inside the release bundle for full operational instructions.
 
@@ -176,6 +182,8 @@ cd frontend && npm run build                       # production build
 | `DATABASE_URL` | `sqlite:////data/taskcentral.db` | SQLAlchemy connection string                    |
 | `CORS_ORIGINS` | `http://localhost:8484`          | Comma-separated allowed origins                 |
 | `LOG_LEVEL`    | `INFO`                           | Backend log level                               |
+| `LOG_MAX_BYTES` | `5242880`                       | Size at which each local log file rotates       |
+| `LOG_BACKUP_COUNT` | `5`                          | Number of older local log files retained        |
 | `SECRET_KEY`   | `change-me`                      | Reserved for future auth; set something random  |
 | `DATA_DIR`     | `/data`                          | Data directory inside the backend container     |
 | `DEMO_MODE`    | `false`                          | Seed sample machines on first start             |
@@ -244,9 +252,9 @@ release:
 To publish:
 
 ```bash
-# Update VERSION and release notes first.
-git tag v1.0.0
-git push origin v1.0.0
+# Example: publish the version recorded in VERSION.
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
 The tag must match the root `VERSION` file. The release workflow tests the backend and frontend,
@@ -352,10 +360,23 @@ which tasks would be added and skips anything already present.
 
 ## Troubleshooting
 
+Task Central keeps persistent, host-readable diagnostics in the project directory:
+
+```bash
+tail -n 200 logs/taskcentral.log
+tail -n 200 logs/frontend.log
+```
+
+`taskcentral.log` records backend startup, application errors, integration failures, and failed
+API requests. `frontend.log` records nginx and reverse-proxy errors. Logs rotate at 5 MiB by
+default and keep five older numbered files. Change `LOG_MAX_BYTES` or `LOG_BACKUP_COUNT` in
+`.env` if needed. Task Central does not intentionally log passwords, API keys, authentication
+headers, chat prompts, or model response bodies.
+
 | Symptom                          | Fix                                                                                     |
 | -------------------------------- | --------------------------------------------------------------------------------------- |
 | Port 8484 already in use         | Set `APP_PORT` in `.env` and `docker compose up -d`                                      |
-| `502` from the frontend          | Backend still starting or unhealthy — `docker compose logs backend`                      |
+| `502` from the frontend          | Check `logs/frontend.log`, then `logs/taskcentral.log`                                   |
 | Database locked errors           | SQLite dislikes concurrent writers; this app is single-user — check for stray processes  |
 | Import rejected                  | The JSON must come from Settings → Export (`"format": "taskcentral-export"`)             |
 | Template error when generating   | The template failed to render — the error message names the line; Reset to default helps |

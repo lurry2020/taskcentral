@@ -1,0 +1,86 @@
+import json
+
+from app.config import get_settings
+from app.models import ApplicationSetting
+from app.services.changelog import (
+    CHANGELOG_SEEN_KEY,
+    has_seen_current_changelog,
+    mark_current_changelog_seen,
+    parse_changelog_section,
+)
+
+
+SAMPLE_CHANGELOG = """# Changelog
+
+## [Unreleased]
+
+- Pending feature
+
+## [1.2.0] - 2026-07-30
+
+### Added
+
+- Current feature
+
+## [1.1.0] - 2026-07-01
+
+- Older feature
+"""
+
+
+def test_parser_returns_only_the_requested_version():
+    entry = parse_changelog_section(SAMPLE_CHANGELOG, "v1.2.0")
+
+    assert entry.version == "1.2.0"
+    assert entry.display_version == "1.2.0"
+    assert entry.released_at == "2026-07-30"
+    assert "Current feature" in entry.content
+    assert "Older feature" not in entry.content
+    assert "Pending feature" not in entry.content
+
+
+def test_development_and_unlisted_release_use_baked_unreleased_section():
+    development = parse_changelog_section(SAMPLE_CHANGELOG, "dev")
+    release = parse_changelog_section(SAMPLE_CHANGELOG, "1.3.0")
+
+    assert development.display_version == "Unreleased"
+    assert development.content == "- Pending feature"
+    assert release.version == "1.3.0"
+    assert release.display_version == "1.3.0"
+    assert release.content == "- Pending feature"
+
+
+def test_seen_version_is_persisted_per_release(db_session):
+    db = db_session()
+    version = "1.2.0"
+    try:
+        assert has_seen_current_changelog(db, version) is False
+        mark_current_changelog_seen(db, version)
+        assert has_seen_current_changelog(db, version) is True
+        assert has_seen_current_changelog(db, "1.3.0") is False
+        assert json.loads(db.get(ApplicationSetting, CHANGELOG_SEEN_KEY).value) == version
+    finally:
+        db.close()
+
+
+def test_changelog_api_marks_current_version_seen(client, db_session):
+    current = get_settings().taskcentral_version
+    db = db_session()
+    row = db.get(ApplicationSetting, CHANGELOG_SEEN_KEY)
+    if row is not None:
+        db.delete(row)
+        db.commit()
+    db.close()
+
+    response = client.get("/api/v1/changelog/current")
+    assert response.status_code == 200
+    assert response.json()["version"] == current
+    assert response.json()["available"] is True
+    assert response.json()["seen"] is False
+    assert "Guided first-run setup with application username" in response.json()["content"]
+    assert "version-aware What's New modal" not in response.json()["content"]
+
+    marked = client.post("/api/v1/changelog/current/seen")
+    assert marked.status_code == 200
+    assert marked.json() == {"version": current, "seen": True}
+    assert client.get("/api/v1/changelog/current").json()["seen"] is True

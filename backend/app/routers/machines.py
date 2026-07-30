@@ -20,6 +20,7 @@ from app.schemas.machine import (
     ChecklistProgress,
     DuplicateRequest,
     MachineCreate,
+    MachineConnectivity,
     MachineListItem,
     MachineOut,
     MachineUpdate,
@@ -29,6 +30,7 @@ from app.schemas.common import Page
 from app.schemas.template import ActivityEventOut
 from app.services.activity import log_event
 from app.services.checklist import checklist_progress, generate_checklist
+from app.services.connectivity import ping_ip_address
 from app.services.hosts import link_existing_guests, sync_host_dependency
 from app.services.reminders import generate_reminders
 from app.models import ActivityEvent
@@ -224,6 +226,27 @@ def create_machine(payload: MachineCreate, db: Session = Depends(get_db)):
 @router.get("/{machine_id}", response_model=MachineOut)
 def get_machine(machine_id: int, db: Session = Depends(get_db)):
     return machine_out(get_machine_or_404(db, machine_id))
+
+
+@router.get("/{machine_id}/connectivity", response_model=MachineConnectivity)
+def machine_connectivity(machine_id: int, db: Session = Depends(get_db)):
+    machine = get_machine_or_404(db, machine_id)
+    checked_at = datetime.now(timezone.utc)
+    if not machine.ip_address:
+        return MachineConnectivity(
+            status="unknown",
+            ip_address=None,
+            checked_at=checked_at,
+            message="No IP address is stored for this machine.",
+        )
+    result = ping_ip_address(machine.ip_address)
+    return MachineConnectivity(
+        status=result.status,
+        ip_address=machine.ip_address,
+        checked_at=checked_at,
+        latency_ms=result.latency_ms,
+        message=result.message,
+    )
 
 
 @router.put("/{machine_id}", response_model=MachineOut)

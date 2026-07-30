@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import logging
 import re
 import socket
 import urllib.error
@@ -11,6 +12,9 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
+
+
+logger = logging.getLogger(__name__)
 
 
 LOCAL_HOSTS = {"localhost", "host.docker.internal", "host.containers.internal"}
@@ -111,9 +115,68 @@ def _provider_endpoint(config: LocalLLMConfig) -> str:
     return base if base.endswith("/chat/completions") else f"{base}/chat/completions"
 
 
+def _models_endpoint(config: LocalLLMConfig) -> str:
+    base = config.base_url.rstrip("/")
+    if config.provider == "ollama":
+        if base.endswith("/api/chat"):
+            base = base[: -len("/api/chat")]
+        return base if base.endswith("/api/tags") else f"{base}/api/tags"
+    if base.endswith("/chat/completions"):
+        base = base[: -len("/chat/completions")]
+    return base if base.endswith("/models") else f"{base}/models"
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
+
+
+def _open_json(request: urllib.request.Request, timeout_seconds: int) -> dict:
+    opener = urllib.request.build_opener(_NoRedirect)
+    try:
+        with opener.open(request, timeout=timeout_seconds) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            body = json.loads(exc.read().decode("utf-8"))
+            detail = body.get("error") or body.get("detail") or body.get("message") or ""
+            if isinstance(detail, dict):
+                detail = detail.get("message") or str(detail)
+        except Exception:
+            detail = ""
+        suffix = f": {str(detail)[:500]}" if detail else ""
+        logger.error(
+            "Local AI HTTP request failed: %s %s -> %s%s",
+            request.method,
+            request.full_url,
+            exc.code,
+            suffix,
+        )
+        raise LocalLLMError(f"Local AI returned HTTP {exc.code}{suffix}") from exc
+    except urllib.error.URLError as exc:
+        logger.error(
+            "Local AI connection failed: %s %s (%s)",
+            request.method,
+            request.full_url,
+            exc.reason,
+        )
+        raise LocalLLMError(f"Could not reach the local AI server: {exc.reason}") from exc
+    except TimeoutError as exc:
+        logger.error(
+            "Local AI request timed out: %s %s after %ss",
+            request.method,
+            request.full_url,
+            timeout_seconds,
+        )
+        raise LocalLLMError("The local AI request timed out.") from exc
+    except json.JSONDecodeError as exc:
+        logger.error(
+            "Local AI returned invalid JSON: %s %s",
+            request.method,
+            request.full_url,
+        )
+        raise LocalLLMError("The local AI server returned invalid JSON.") from exc
 
 
 def _post_json(config: LocalLLMConfig, messages: list[dict[str, str]]) -> dict:
@@ -141,27 +204,36 @@ def _post_json(config: LocalLLMConfig, messages: list[dict[str, str]]) -> dict:
         headers=headers,
         method="POST",
     )
-    opener = urllib.request.build_opener(_NoRedirect)
-    try:
-        with opener.open(request, timeout=config.timeout_seconds) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = ""
-        try:
-            body = json.loads(exc.read().decode("utf-8"))
-            detail = body.get("error") or body.get("detail") or body.get("message") or ""
-            if isinstance(detail, dict):
-                detail = detail.get("message") or str(detail)
-        except Exception:
-            detail = ""
-        suffix = f": {str(detail)[:500]}" if detail else ""
-        raise LocalLLMError(f"Local AI returned HTTP {exc.code}{suffix}") from exc
-    except urllib.error.URLError as exc:
-        raise LocalLLMError(f"Could not reach the local AI server: {exc.reason}") from exc
-    except TimeoutError as exc:
-        raise LocalLLMError("The local AI request timed out.") from exc
-    except json.JSONDecodeError as exc:
-        raise LocalLLMError("The local AI server returned invalid JSON.") from exc
+    return _open_json(request, config.timeout_seconds)
+
+
+def list_local_llm_models(config: LocalLLMConfig) -> list[str]:
+    """Return model identifiers exposed by the configured local provider."""
+    headers = {"Accept": "application/json"}
+    if config.api_key:
+        headers["Authorization"] = f"Bearer {config.api_key}"
+    request = urllib.request.Request(
+        _models_endpoint(config),
+        headers=headers,
+        method="GET",
+    )
+    body = _open_json(request, config.timeout_seconds)
+    key = "models" if config.provider == "ollama" else "data"
+    entries = body.get(key)
+    if not isinstance(entries, list):
+        raise LocalLLMError("The local AI server returned an unsupported model list.")
+
+    models: set[str] = set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        if config.provider == "ollama":
+            value = entry.get("name") or entry.get("model")
+        else:
+            value = entry.get("id")
+        if isinstance(value, str) and value.strip():
+            models.add(value.strip())
+    return sorted(models, key=str.casefold)[:500]
 
 
 def _response_content(config: LocalLLMConfig, body: dict) -> str:
@@ -171,6 +243,15 @@ def _response_content(config: LocalLLMConfig, body: dict) -> str:
         choices = body.get("choices") or []
         content = (choices[0].get("message") or {}).get("content") if choices else None
     if not isinstance(content, str) or not content.strip():
+        message = body.get("message")
+        message_keys = sorted(message) if isinstance(message, dict) else []
+        logger.error(
+            "Local AI response had no usable content "
+            "(provider=%s, response_keys=%s, message_keys=%s)",
+            config.provider,
+            sorted(body),
+            message_keys,
+        )
         raise LocalLLMError("The local AI server returned an empty or unsupported response.")
     return content.strip()
 

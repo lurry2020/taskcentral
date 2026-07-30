@@ -15,6 +15,38 @@ def test_create_machine_generates_checklist(client, machine):
     assert "Record hardware inventory details" not in titles
 
 
+def test_machine_connectivity_uses_stored_ip(client, machine, monkeypatch):
+    import app.routers.machines as machine_router
+    from app.services.connectivity import PingResult
+
+    monkeypatch.setattr(
+        machine_router,
+        "ping_ip_address",
+        lambda address: PingResult("online", 1.25, f"Reply from {address}."),
+    )
+
+    response = client.get(f"/api/v1/machines/{machine['id']}/connectivity")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "online"
+    assert response.json()["ip_address"] == "192.168.1.50"
+    assert response.json()["latency_ms"] == 1.25
+
+
+def test_machine_connectivity_without_ip_is_unknown(client):
+    machine = client.post(
+        "/api/v1/machines",
+        json={"name": "no-ip", "machine_type": "VM"},
+    ).json()
+
+    response = client.get(f"/api/v1/machines/{machine['id']}/connectivity")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "unknown"
+    assert response.json()["ip_address"] is None
+    assert "No IP address" in response.json()["message"]
+
+
 def test_create_host_machine_and_document(client):
     resp = client.post(
         "/api/v1/machines",

@@ -17,8 +17,8 @@ Extract the release bundle, enter its directory, and run:
 ```
 
 The installer asks for the web port (default `8484`), generates unique session and fallback
-credentials, creates private `data/` and `backups/` directories, pulls the release images, starts
-the application, and waits for both containers to become healthy.
+credentials, creates private `data/`, `backups/`, and `logs/` directories, pulls the release
+images, starts the application, and waits for both containers to become healthy.
 
 Open `http://localhost:8484` or `http://SERVER-IP:8484` and complete the first-run setup wizard.
 The username and password selected in the wizard replace the generated fallback credentials.
@@ -43,7 +43,8 @@ Install a specific release:
 An update downloads the new images before downtime, creates an online SQLite backup, changes the
 pinned image version, starts the new containers, applies database migrations, and waits for health
 checks. If startup fails, it automatically restores both the previous version and the pre-update
-database.
+database. After the next login and Dashboard visit, Task Central shows that version's release notes
+once. Use the **Changelog** button at the bottom of the sidebar to reopen them later.
 
 ## Back up and restore
 
@@ -67,7 +68,15 @@ You can also create portable JSON exports from **Settings → Data Management**.
 
 ```bash
 docker compose --env-file .env -f compose.yml ps
-docker compose --env-file .env -f compose.yml logs -f
+tail -f logs/taskcentral.log logs/frontend.log
+```
+
+`taskcentral.log` contains backend startup, application, integration, and failed-request entries.
+`frontend.log` contains nginx and proxy errors. Both files rotate at 5 MiB by default and retain
+five older numbered copies. Docker console logs remain available as a fallback:
+
+```bash
+docker compose --env-file .env -f compose.yml logs --tail=200
 ```
 
 ## Stop or uninstall
@@ -78,13 +87,13 @@ Stop the application without removing containers:
 docker compose --env-file .env -f compose.yml stop
 ```
 
-Remove the containers while preserving configuration, data, and backups:
+Remove the containers while preserving configuration, data, backups, and logs:
 
 ```bash
 ./uninstall.sh
 ```
 
-Permanently delete the local database, backups, configuration, and containers:
+Permanently delete the local database, backups, logs, configuration, and containers:
 
 ```bash
 ./uninstall.sh --delete-data
@@ -103,6 +112,8 @@ The installer writes `.env` with permissions limited to the current user. Common
 | `TASKCENTRAL_VERSION` | Pinned container release |
 | `TASKCENTRAL_IMAGE_PREFIX` | Container registry and owner |
 | `LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, or `ERROR` |
+| `LOG_MAX_BYTES` | Rotation size for each local log file; default `5242880` |
+| `LOG_BACKUP_COUNT` | Number of older log files retained; default `5` |
 | `DEMO_MODE` | Seed removable sample machines on the first start |
 
 Do not share `.env`; it contains the session signing key and a generated fallback password.
@@ -132,8 +143,13 @@ docker compose --env-file .env -f compose.yml ps
 View recent logs:
 
 ```bash
-docker compose --env-file .env -f compose.yml logs --tail=200
+tail -n 200 logs/taskcentral.log
+tail -n 200 logs/frontend.log
 ```
+
+The files intentionally omit passwords, API keys, authentication headers, chat prompts, and model
+response bodies. Use Docker console logs only if the local files do not explain a container that
+failed before its logging mount initialized.
 
 If port `8484` is already used, stop Task Central, change `APP_PORT` in `.env`, and run
 `./install.sh` again. Existing settings and data are preserved.

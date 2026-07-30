@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { FormField, Input, Select } from "@/components/ui/Field";
 import { TimezoneSelect } from "@/components/ui/TimezoneSelect";
+import { LocalAIModelSelect } from "@/components/LocalAIModelSelect";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -450,6 +451,7 @@ export function SetupPage({ onComplete }: { onComplete: () => void }) {
                       setDraft((current) => ({
                         ...current,
                         llmProvider: provider,
+                        llmModel: "",
                         llmBaseUrl:
                           provider === "ollama"
                             ? "http://host.docker.internal:11434"
@@ -463,27 +465,17 @@ export function SetupPage({ onComplete }: { onComplete: () => void }) {
                     <option value="openai_compatible">OpenAI-compatible local server</option>
                   </Select>
                 </FormField>
-                <FormField label="Model" htmlFor="setup-llm-model">
-                  <Input
-                    id="setup-llm-model"
-                    value={draft.llmModel}
-                    onChange={(event) => {
-                      set("llmModel", event.target.value);
-                      setLlmResult(null);
-                    }}
-                    placeholder={draft.llmProvider === "ollama" ? "llama3.2:3b" : "local-model"}
-                    required
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                </FormField>
                 <FormField label="Base URL" htmlFor="setup-llm-url" className="sm:col-span-2">
                   <Input
                     id="setup-llm-url"
                     type="url"
                     value={draft.llmBaseUrl}
                     onChange={(event) => {
-                      set("llmBaseUrl", event.target.value);
+                      setDraft((current) => ({
+                        ...current,
+                        llmBaseUrl: event.target.value,
+                        llmModel: "",
+                      }));
                       setLlmResult(null);
                     }}
                     required
@@ -526,6 +518,21 @@ export function SetupPage({ onComplete }: { onComplete: () => void }) {
                     ))}
                   </Select>
                 </FormField>
+                <LocalAIModelSelect
+                  id="setup-llm-model"
+                  endpoint="/setup/llm-models"
+                  provider={draft.llmProvider}
+                  baseUrl={draft.llmBaseUrl}
+                  apiKey={draft.llmApiKey}
+                  timeoutSeconds={draft.llmTimeoutSeconds}
+                  value={draft.llmModel}
+                  onChange={(model) => {
+                    set("llmModel", model);
+                    setLlmResult(null);
+                  }}
+                  className="sm:col-span-2"
+                  required
+                />
                 <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
                   <Button
                     type="button"

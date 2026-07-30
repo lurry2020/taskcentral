@@ -22,6 +22,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Checkbox, FormField, Input, Select } from "@/components/ui/Field";
 import { TimezoneSelect } from "@/components/ui/TimezoneSelect";
+import { LocalAIModelSelect } from "@/components/LocalAIModelSelect";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { ErrorState, LoadingState } from "@/components/ui/State";
 import { useToast } from "@/components/ui/Toast";
@@ -568,6 +569,7 @@ export function SettingsPage() {
                       return {
                         ...current,
                         llm_provider: provider,
+                        llm_model: "",
                         llm_base_url: knownDefaults.includes(current.llm_base_url)
                           ? provider === "ollama"
                             ? knownDefaults[0]
@@ -580,25 +582,6 @@ export function SettingsPage() {
                   <option value="ollama">Ollama</option>
                   <option value="openai_compatible">OpenAI-compatible local server</option>
                 </Select>
-              </FormField>
-
-              <FormField
-                label="Model"
-                htmlFor="s-llm-model"
-                hint={
-                  draft.llm_provider === "ollama"
-                    ? "Exact installed model name, e.g. llama3.2:3b"
-                    : "Model identifier exposed by your local server"
-                }
-              >
-                <Input
-                  id="s-llm-model"
-                  value={draft.llm_model}
-                  onChange={(e) => set("llm_model", e.target.value)}
-                  placeholder={draft.llm_provider === "ollama" ? "llama3.2:3b" : "local-model"}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
               </FormField>
 
               <FormField
@@ -615,7 +598,17 @@ export function SettingsPage() {
                   id="s-llm-url"
                   type="url"
                   value={draft.llm_base_url}
-                  onChange={(e) => set("llm_base_url", e.target.value)}
+                  onChange={(e) =>
+                    setDraft((current) =>
+                      current
+                        ? {
+                            ...current,
+                            llm_base_url: e.target.value,
+                            llm_model: "",
+                          }
+                        : current,
+                    )
+                  }
                   placeholder={
                     draft.llm_provider === "ollama"
                       ? "http://host.docker.internal:11434"
@@ -656,8 +649,19 @@ export function SettingsPage() {
                         : `${seconds / 60} minute${seconds === 60 ? "" : "s"}`}
                     </option>
                   ))}
-                </Select>
-              </FormField>
+                  </Select>
+                </FormField>
+              <LocalAIModelSelect
+                id="s-llm-model"
+                endpoint="/settings/llm-models"
+                provider={draft.llm_provider}
+                baseUrl={draft.llm_base_url}
+                apiKey={draft.llm_api_key}
+                timeoutSeconds={draft.llm_timeout_seconds}
+                value={draft.llm_model}
+                onChange={(model) => set("llm_model", model)}
+                className="sm:col-span-2"
+              />
             </div>
 
             <label className="flex items-start gap-2 text-sm">

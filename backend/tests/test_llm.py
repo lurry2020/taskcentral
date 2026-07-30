@@ -39,6 +39,7 @@ def test_public_hostname_is_rejected(monkeypatch):
 def test_provider_endpoints():
     ollama = llm.LocalLLMConfig("ollama", "http://ollama:11434", "llama3.2")
     assert llm._provider_endpoint(ollama) == "http://ollama:11434/api/chat"
+    assert llm._models_endpoint(ollama) == "http://ollama:11434/api/tags"
     openai = llm.LocalLLMConfig(
         "openai_compatible", "http://host.docker.internal:1234/v1", "local-model"
     )
@@ -46,6 +47,63 @@ def test_provider_endpoints():
         llm._provider_endpoint(openai)
         == "http://host.docker.internal:1234/v1/chat/completions"
     )
+    assert (
+        llm._models_endpoint(openai)
+        == "http://host.docker.internal:1234/v1/models"
+    )
+
+
+@pytest.mark.parametrize(
+    ("config", "body", "expected"),
+    [
+        (
+            llm.LocalLLMConfig("ollama", "http://ollama:11434", ""),
+            {
+                "models": [
+                    {"name": "qwen2.5:7b"},
+                    {"model": "llama3.2:3b"},
+                    {"name": "qwen2.5:7b"},
+                ]
+            },
+            ["llama3.2:3b", "qwen2.5:7b"],
+        ),
+        (
+            llm.LocalLLMConfig(
+                "openai_compatible",
+                "http://host.docker.internal:1234/v1",
+                "",
+                api_key="secret",
+            ),
+            {"data": [{"id": "z-model"}, {"id": "a-model"}]},
+            ["a-model", "z-model"],
+        ),
+    ],
+)
+def test_model_discovery_parses_provider_responses(monkeypatch, config, body, expected):
+    captured = {}
+
+    def fake_open(request, timeout_seconds):
+        captured["url"] = request.full_url
+        captured["authorization"] = request.headers.get("Authorization")
+        captured["timeout"] = timeout_seconds
+        return body
+
+    monkeypatch.setattr(llm, "_open_json", fake_open)
+
+    assert llm.list_local_llm_models(config) == expected
+    assert captured["url"] == llm._models_endpoint(config)
+    assert captured["timeout"] == 60
+    assert captured["authorization"] == (
+        "Bearer secret" if config.api_key else None
+    )
+
+
+def test_model_discovery_rejects_unsupported_response(monkeypatch):
+    config = llm.LocalLLMConfig("ollama", "http://ollama:11434", "")
+    monkeypatch.setattr(llm, "_open_json", lambda request, timeout: {"unexpected": []})
+
+    with pytest.raises(llm.LocalLLMError, match="unsupported model list"):
+        llm.list_local_llm_models(config)
 
 
 def test_provider_response_parsing():

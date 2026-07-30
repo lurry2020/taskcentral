@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -9,6 +10,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.database import SessionLocal, engine
+from app.logging_config import configure_logging
 from app.models import Base
 from app.routers import api_router
 from app.services.alerts import alert_loop
@@ -22,16 +24,13 @@ AUTH_EXEMPT_PATHS = {
     "/api/v1/auth/login",
     "/api/v1/setup/status",
     "/api/v1/setup/complete",
+    "/api/v1/setup/llm-models",
     "/api/v1/setup/test-telegram",
     "/api/v1/setup/test-llm",
 }
 
 settings = get_settings()
-
-logging.basicConfig(
-    level=settings.log_level.upper(),
-    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-)
+configure_logging(settings)
 logger = logging.getLogger("taskcentral")
 
 
@@ -63,7 +62,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Task Central API",
-    version="1.0.0",
+    version=settings.taskcentral_version,
     description="Homelab machine provisioning and documentation tracker.",
     lifespan=lifespan,
     # Served under /api/* so the docs remain reachable through the nginx proxy.
@@ -79,6 +78,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_failed_requests(request: Request, call_next):
+    started_at = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception(
+            "Unhandled request failure: %s %s",
+            request.method,
+            request.url.path,
+        )
+        raise
+
+    if response.status_code >= 400:
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        log = logger.error if response.status_code >= 500 else logger.warning
+        log(
+            "Request failed: %s %s -> %s (%.1f ms)",
+            request.method,
+            request.url.path,
+            response.status_code,
+            elapsed_ms,
+        )
+    return response
 
 
 @app.middleware("http")

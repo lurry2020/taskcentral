@@ -39,8 +39,8 @@ else
   set_env AUTH_PASSWORD "$(random_hex)"
 fi
 
-mkdir -p "$DATA_DIR" "$BACKUP_DIR"
-chmod 700 "$DATA_DIR" "$BACKUP_DIR"
+mkdir -p "$DATA_DIR" "$BACKUP_DIR" "$LOG_DIR"
+chmod 700 "$DATA_DIR" "$BACKUP_DIR" "$LOG_DIR"
 
 info "Pulling Task Central $(read_env TASKCENTRAL_VERSION)…"
 tc_compose pull

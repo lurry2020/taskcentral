@@ -127,3 +127,21 @@ class LLMTestResult(BaseModel):
     ok: bool
     message: str
     reply: str | None = None
+
+
+class LLMModelsRequest(BaseModel):
+    llm_provider: Literal["ollama", "openai_compatible"]
+    llm_base_url: str = Field(min_length=1, max_length=500)
+    llm_api_key: str = Field(default="", max_length=500)
+    llm_timeout_seconds: int = Field(default=60, ge=5, le=600)
+
+    @field_validator("llm_base_url")
+    @classmethod
+    def _local_url(cls, v: str) -> str:
+        return validate_local_base_url(v)
+
+
+class LLMModelsResult(BaseModel):
+    ok: bool
+    message: str
+    models: list[str] = Field(default_factory=list)

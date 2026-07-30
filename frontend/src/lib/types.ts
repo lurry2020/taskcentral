@@ -65,6 +65,28 @@ export interface Machine extends MachineBase {
   warnings: string[];
 }
 
+export interface MachineConnectivity {
+  status: "online" | "offline" | "unknown";
+  ip_address: string | null;
+  checked_at: string;
+  latency_ms: number | null;
+  message: string;
+}
+
+export interface CurrentChangelog {
+  version: string;
+  display_version: string;
+  released_at: string | null;
+  content: string;
+  available: boolean;
+  seen: boolean;
+}
+
+export interface ChangelogSeen {
+  version: string;
+  seen: boolean;
+}
+
 export interface MachineListItem {
   id: number;
   name: string;

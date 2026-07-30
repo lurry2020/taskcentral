@@ -152,6 +152,7 @@ jobs:
             release/uninstall.sh \
             release/README.md \
             MANUAL.md \
+            CHANGELOG.md \
             "$bundle_dir/"
           cp release/VERSION "$bundle_dir/VERSION"
           sed -i \

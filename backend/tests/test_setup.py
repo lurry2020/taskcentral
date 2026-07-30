@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
+from app.config import get_settings
 from app.database import build_engine
 from app.models import ApplicationSetting, Base, MachineTask, TaskTemplate
 from app.schemas.setup import SetupCompleteRequest
@@ -62,6 +63,9 @@ def test_new_database_setup_is_atomic_and_preserves_seed_data():
         assert json.loads(db.get(ApplicationSetting, "telegram_bot_token").value) == "bot-token"
         assert json.loads(db.get(ApplicationSetting, "llm_enabled").value) is True
         assert json.loads(db.get(ApplicationSetting, "llm_model").value) == "llama3.2:3b"
+        assert json.loads(db.get(ApplicationSetting, "changelog_seen_version").value) == (
+            get_settings().taskcentral_version
+        )
         assert db.scalar(select(func.count()).select_from(TaskTemplate)) == templates_before
         assert db.scalar(select(func.count()).select_from(MachineTask)) == tasks_before
 
@@ -170,6 +174,61 @@ def test_setup_api_is_single_use(client, db_session):
     assert response.json() == {"completed": True}
     assert client.get("/api/v1/setup/status").json()["completed"] is True
     assert client.post("/api/v1/setup/complete", json=_payload().model_dump()).status_code == 409
+
+
+def test_model_discovery_is_available_during_setup(client, db_session, monkeypatch):
+    import app.routers.setup as setup_router
+
+    db = db_session()
+    db.get(ApplicationSetting, SETUP_COMPLETED_KEY).value = json.dumps(False)
+    db.commit()
+    db.close()
+    monkeypatch.setattr(
+        setup_router,
+        "list_local_llm_models",
+        lambda config: ["llama3.2:3b", "qwen2.5:7b"],
+    )
+
+    response = client.post(
+        "/api/v1/setup/llm-models",
+        headers={"Authorization": ""},
+        json={
+            "llm_provider": "ollama",
+            "llm_base_url": "http://host.docker.internal:11434",
+            "llm_api_key": "",
+            "llm_timeout_seconds": 60,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": True,
+        "message": "Found 2 local models.",
+        "models": ["llama3.2:3b", "qwen2.5:7b"],
+    }
+
+
+def test_authenticated_settings_model_discovery(client, monkeypatch):
+    import app.routers.settings_router as settings_router
+
+    monkeypatch.setattr(
+        settings_router,
+        "list_local_llm_models",
+        lambda config: ["local-model"],
+    )
+
+    response = client.post(
+        "/api/v1/settings/llm-models",
+        json={
+            "llm_provider": "openai_compatible",
+            "llm_base_url": "http://host.docker.internal:1234/v1",
+            "llm_api_key": "key",
+            "llm_timeout_seconds": 60,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["models"] == ["local-model"]
 
 
 def test_login_is_blocked_until_setup_is_complete(client, db_session):

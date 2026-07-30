@@ -1,4 +1,5 @@
 import json
+import logging
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -8,6 +9,8 @@ from app.models import ApplicationSetting
 from app.schemas.settings import (
     SettingsOut,
     SettingsUpdate,
+    LLMModelsRequest,
+    LLMModelsResult,
     LLMTestRequest,
     LLMTestResult,
     TelegramTestRequest,
@@ -19,10 +22,12 @@ from app.services.telegram import send_telegram_message
 from app.services.llm import (
     LocalLLMConfig,
     LocalLLMError,
+    list_local_llm_models,
     test_local_llm,
 )
 
 router = APIRouter(prefix="/settings", tags=["settings"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=SettingsOut)
@@ -77,7 +82,31 @@ def test_llm(payload: LLMTestRequest):
         reply = test_local_llm(config)
         return LLMTestResult(ok=True, message="Local AI connection succeeded.", reply=reply)
     except (LocalLLMError, ValueError) as exc:
+        logger.warning("Local AI connection test failed: %s", exc)
         return LLMTestResult(ok=False, message=str(exc))
+
+
+@router.post("/llm-models", response_model=LLMModelsResult)
+def llm_models(payload: LLMModelsRequest):
+    config = LocalLLMConfig(
+        provider=payload.llm_provider,
+        base_url=payload.llm_base_url,
+        model="",
+        api_key=payload.llm_api_key.strip(),
+        timeout_seconds=min(payload.llm_timeout_seconds, 30),
+        include_manual=False,
+    )
+    try:
+        models = list_local_llm_models(config)
+        message = (
+            f"Found {len(models)} local model{'s' if len(models) != 1 else ''}."
+            if models
+            else "No installed models were reported by the local AI server."
+        )
+        return LLMModelsResult(ok=True, message=message, models=models)
+    except (LocalLLMError, ValueError) as exc:
+        logger.warning("Local AI model discovery failed: %s", exc)
+        return LLMModelsResult(ok=False, message=str(exc))
 
 
 @router.post("/restore-default-templates")

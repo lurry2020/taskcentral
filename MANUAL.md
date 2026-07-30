@@ -4,7 +4,7 @@ This manual is the primary user-facing reference for Task Central. It explains w
 application does, how its workflows behave, how to operate and maintain an installation, and
 which current-version limitations matter when troubleshooting.
 
-It reflects the repository and database behavior reviewed on July 27, 2026. If a later release
+It reflects the repository and database behavior reviewed on July 30, 2026. If a later release
 changes behavior, its release notes and current source take precedence over version-specific
 details here.
 
@@ -39,8 +39,10 @@ Markdown document.
 - [Backup, export, import, and recovery](#backup-export-import-and-recovery)
 - [Installation and deployment](#installation-and-deployment)
 - [Upgrading](#upgrading)
+- [Changelog and What's New](#changelog-and-whats-new)
 - [API access](#api-access)
 - [Security guidance](#security-guidance)
+- [Logs and diagnostics](#logs-and-diagnostics)
 - [Troubleshooting](#troubleshooting)
 - [Known current-version caveats](#known-current-version-caveats)
 - [Technical reference](#technical-reference)
@@ -177,7 +179,10 @@ The wizard has five screens:
      configured later under **Settings → Alerts**.
 4. **Local AI**
    - Choose Ollama or an OpenAI-compatible local server.
-   - Enter the model, base URL, optional API key, and request timeout.
+   - Enter the base URL and optional API key. Task Central asks the local server for its installed
+     models and fills the model dropdown automatically.
+   - Select a model from the dropdown. Use **Refresh** after installing or loading another model.
+   - Choose the request timeout.
    - Provider, model, base URL, and timeout are required when proceeding with local AI.
    - **Test connection** uses the currently entered values without saving them.
    - Only local/private-network AI endpoints are accepted.
@@ -224,10 +229,11 @@ Every `/api/v1/*` endpoint requires authentication except:
 - `POST /api/v1/auth/login`
 - `GET /api/v1/setup/status`
 - `POST /api/v1/setup/complete`
+- `POST /api/v1/setup/llm-models`
 - `POST /api/v1/setup/test-telegram`
 - `POST /api/v1/setup/test-llm`
 
-The three setup mutation/test endpoints are usable only before setup is completed. Login is
+The four setup mutation/test endpoints are usable only before setup is completed. Login is
 blocked until setup is complete.
 
 ### Changing the password
@@ -317,13 +323,22 @@ It never appears on the login or forgot-password screens.
 - Select the minus button in the window header to minimize it.
 - The open or minimized state persists while navigating between pages.
 - The state is also stored in the current browser, so it survives a refresh.
-- Each browser or device keeps its own chat-window preference.
+- Drag the diagonal resize control in the window's upper-left corner to change its width and
+  height. The window remains anchored to the bottom-right corner.
+- Resizing is bounded to a practical range: approximately 280–480 pixels wide and 320–640 pixels
+  tall, while always fitting within the current browser viewport.
+- The selected size persists across page navigation, minimizing/reopening, and browser refreshes.
+- Each browser or device keeps its own chat-window open/minimized and size preferences.
 
 The chat connects only to an LLM server configured under **Settings → Local AI**. Supported
 provider protocols are:
 
 - Ollama's `/api/chat` API.
 - An OpenAI-compatible `/chat/completions` API, such as the local server in LM Studio.
+
+For model discovery, Task Central calls Ollama's `/api/tags` endpoint or the OpenAI-compatible
+`/models` endpoint. These requests come from the backend container, so the model server must be
+reachable from that container rather than only from the user's browser.
 
 Task Central deliberately rejects public model endpoints. The model must be reachable from the
 backend container through loopback, a private IP address, a local hostname, a Docker service name,
@@ -350,10 +365,11 @@ or `host.docker.internal`.
 
    - Provider: **Ollama**
    - Base URL: `http://host.docker.internal:11434`
-   - Model: the exact installed tag, such as `llama3.2:3b`
+   - Model: select an installed tag, such as `llama3.2:3b`, from the automatically loaded dropdown
 
-6. Select **Test connection**.
-7. Enable local AI chat and save Settings.
+6. Select **Refresh** if the newly installed model is not shown.
+7. Select **Test connection**.
+8. Enable local AI chat and save Settings.
 
 If Ollama is in a Docker service reachable on the same Docker network, use its service name, such
 as `http://ollama:11434`.
@@ -367,11 +383,12 @@ as `http://ollama:11434`.
 
    - Provider: **OpenAI-compatible local server**
    - Base URL: for example `http://host.docker.internal:1234/v1`
-   - Model: the identifier exposed by the server
    - API key: only if the local server requires a Bearer token
+   - Model: select an identifier returned by the server from the model dropdown
 
-4. Select **Test connection**.
-5. Enable local AI chat and save Settings.
+4. Select **Refresh** if the loaded model is not shown.
+5. Select **Test connection**.
+6. Enable local AI chat and save Settings.
 
 Task Central appends `/chat/completions` to the configured OpenAI-compatible base URL unless the
 URL already ends in that path.
@@ -384,7 +401,8 @@ URL already ends in that path.
   and includes them in the system prompt.
 - Chat messages remain in browser memory while the authenticated layout is mounted. They are not
   stored in the Task Central database and disappear on refresh, sign-out, or **Clear chat**.
-- The minimized/open state is stored separately in browser local storage.
+- The minimized/open state and bounded window dimensions are stored separately in browser local
+  storage.
 - Requests are not streamed; the Thinking indicator remains until the complete local-model
   response arrives or the configured timeout is reached.
 - Model output is rendered as sanitized Markdown.
@@ -584,8 +602,22 @@ Permanent deletion is not recoverable from the application. Make a backup first.
 
 ## Machine detail pages
 
-Every machine has a header with its type, status, tags, checklist progress, addressing, and
-actions such as Edit, Duplicate, and Archive/Restore.
+Every machine has a header with its type, tags, checklist progress, addressing, and actions such
+as Edit, Duplicate, and Archive/Restore. The editable machine status is not displayed in this
+header.
+
+When a machine has a stored IP address, the header also shows ICMP reachability:
+
+- **Online** means the Task Central backend container received a ping reply.
+- **Offline** means no reply arrived before the short ping timeout, the check could not run, or
+  the machine has no IP address to check.
+
+The page checks when it opens, repeats the check every 30 seconds while open, and provides a
+refresh button for an immediate check. Ping runs from the backend container, not the user's
+browser, and no reachability history is stored. The header displays only plain `Online` or
+`Offline` text; hover over it to see the ping result, check time, and round-trip latency when
+available. A device can be operational while appearing Offline if its host firewall, network
+firewall, or VLAN policy blocks ICMP echo requests.
 
 Visible tabs vary by type:
 
@@ -1206,10 +1238,11 @@ replace an already-seeded database setting.
 
 - **Enable local AI chat**: Allows the chat window to send messages.
 - **Provider**: Ollama or OpenAI-compatible local server.
-- **Model**: Exact local model name or identifier.
 - **Base URL**: Local endpoint reachable from the backend container.
 - **API key**: Optional Bearer token stored in the application database.
 - **Request timeout**: 30 seconds through 10 minutes.
+- **Model**: Dropdown populated from the local server after a valid base URL is entered. The list
+  refreshes automatically; **Refresh** requests it again on demand.
 - **Include relevant Task Central manual sections**: Adds keyword-selected documentation to each
   chat request.
 - **Test connection**: Uses the unsaved form values and asks the model for a short confirmation.
@@ -1474,8 +1507,11 @@ backend health check before starting.
 # Status
 docker compose ps
 
-# Follow logs
-docker compose logs -f backend frontend
+# Follow persistent local logs
+tail -f logs/taskcentral.log logs/frontend.log
+
+# Docker console logs remain available as a fallback
+docker compose logs --tail=200 backend frontend
 
 # Rebuild both services
 docker compose build backend frontend
@@ -1509,6 +1545,8 @@ A healthy response is:
 | `DATABASE_URL` | SQLite under the resolved data directory | SQLAlchemy database URL |
 | `CORS_ORIGINS` | Local development and port 8484 in code | Comma-separated origins allowed by CORS |
 | `LOG_LEVEL` | `INFO` | Backend logging level |
+| `LOG_MAX_BYTES` | `5242880` | Size at which each persistent local log rotates |
+| `LOG_BACKUP_COUNT` | `5` | Number of older numbered log files retained |
 | `SECRET_KEY` | `change-me` | HMAC key used to sign login session tokens |
 | `DATA_DIR` | Repository `data` locally, `/data` in the container | Data directory |
 | `DEMO_MODE` | `false` | Seed sample machines on startup |
@@ -1623,11 +1661,57 @@ docker compose up -d
 Migrations apply automatically when the backend container starts. Monitor:
 
 ```bash
-docker compose logs -f backend
+tail -f logs/taskcentral.log logs/frontend.log
 ```
 
 Do not downgrade the database casually. SQLite constraint changes use table-rebuild migrations,
 and older application versions may not understand newer machine types or fields.
+
+## Changelog and What's New
+
+Task Central keeps release notes in the repository-level `CHANGELOG.md`. The backend reads that
+file and returns only the section associated with the running `TASKCENTRAL_VERSION`; older release
+sections are not sent to the modal. Development builds use the `[Unreleased]` section. A tagged
+release can also use the immutable `[Unreleased]` section baked into that release image when an
+exact version heading is not present.
+
+After an existing installation updates to a version it has not seen:
+
+1. The user signs in and visits the Dashboard at `/`.
+2. Task Central automatically opens the **What's New in Task Central** modal.
+3. The modal renders only the current version's Markdown notes.
+4. The current version is stored internally as `changelog_seen_version`, preventing another
+   automatic popup for that version.
+
+This acknowledgement is application-wide and stored in the Task Central database, rather than
+browser storage. It therefore remains consistent across pages and browsers. A new version has a
+different identifier and will automatically appear once after that update. Brand-new
+installations mark their setup version as seen when the first-run wizard completes, so initial
+installation is not misidentified as an update.
+
+The **Changelog** button remains at the bottom of the desktop and mobile sidebar. It reopens the
+same current-version modal at any time and does not display older versions. Close the modal with
+its **X**, the Escape key, or the backdrop.
+
+Maintainers write release sections in this format:
+
+```markdown
+## [1.2.3] - 2026-07-30
+
+### Added
+
+- Description of the current release change.
+```
+
+The changelog endpoint is authenticated:
+
+```text
+GET  /api/v1/changelog/current
+POST /api/v1/changelog/current/seen
+```
+
+The `POST` endpoint records only the running version. It does not alter inventory or user
+configuration.
 
 ## API access
 
@@ -1668,6 +1752,7 @@ Do not paste real tokens into tickets, notes, prompts, or command history.
 | `/auth` | Login and current-user validation |
 | `/health` | Database-backed health check |
 | `/chat` | Authenticated local-LLM chat completion |
+| `/changelog` | Current-version notes and the one-time seen acknowledgement |
 | `/dashboard` | Summary, recent machines, and attention items |
 | `/machines` | Inventory CRUD, validation, duplicate, archive, hosts, tags, and activity |
 | `/machines/{id}/tasks` | Checklist task operations |
@@ -1725,6 +1810,124 @@ Application protections include:
 The application does not provide multiple users, roles, permissions, token revocation lists,
 rate limiting, account lockout, or built-in TLS.
 
+## Logs and diagnostics
+
+Task Central writes persistent diagnostic files directly under the installation or project
+directory. They are not stored under `data/`, and users normally do not need `docker logs` to
+read them.
+
+### Exact log locations
+
+For the source installation used throughout this manual:
+
+```text
+/taskcentral/logs/taskcentral.log
+/taskcentral/logs/frontend.log
+```
+
+For the separate test installation:
+
+```text
+/testtaskcentral/logs/taskcentral.log
+/testtaskcentral/logs/frontend.log
+```
+
+For a release-bundle installation, `logs/` is inside the extracted installation directory—the
+same directory that contains `compose.yml`, `.env`, `install.sh`, and `update.sh`. For example, if
+the release was extracted to `/opt/taskcentral`, the files are
+`/opt/taskcentral/logs/taskcentral.log` and `/opt/taskcentral/logs/frontend.log`.
+
+The complete directory can contain active and rotated files:
+
+```text
+logs/
+├── taskcentral.log
+├── taskcentral.log.1
+├── ...
+├── frontend.log
+└── frontend.log.1
+```
+
+- `taskcentral.log` contains backend startup and migration output, application exceptions,
+  integration failures such as local-AI or Telegram connection problems, and failed API request
+  status codes.
+- `frontend.log` contains nginx startup, upstream, timeout, and reverse-proxy errors. Routine
+  browser access requests are intentionally omitted.
+- The active files rotate at 5 MiB by default and keep five older numbered copies. Configure
+  `LOG_MAX_BYTES` and `LOG_BACKUP_COUNT` in `.env`, then recreate the containers to change this.
+- Task Central does not intentionally record passwords, API keys, bearer tokens, chat prompts, or
+  model response bodies. Local-AI response-shape errors record only structural field names.
+
+### Reading the logs
+
+From the installation directory, read the newest entries without interacting with Docker:
+
+```bash
+cd /taskcentral
+tail -n 200 logs/taskcentral.log
+tail -n 200 logs/frontend.log
+```
+
+Use `tail -f logs/taskcentral.log logs/frontend.log` to watch both files while reproducing a
+problem. `docker compose logs --tail=200` remains a fallback for failures that happen before a
+container can initialize its mounted log file.
+
+To search active and rotated logs for likely failures:
+
+```bash
+grep -i -E 'critical|error|warning|failed|timeout' logs/*.log*
+```
+
+An empty `frontend.log` is normal when nginx has not encountered a warning, proxy failure, or
+server error.
+
+### Logging implementation
+
+The backend uses Python's built-in `logging` module with `RotatingFileHandler`. Uvicorn server
+errors and Task Central application loggers write to `taskcentral.log`. The frontend uses nginx's
+native error log, written to `frontend.log`; routine nginx access logging is disabled to avoid
+noise and unnecessary disk usage.
+
+### Configuring the log level and rotation
+
+`LOG_LEVEL` controls backend logging only. Supported values are:
+
+| Value | What it records |
+|---|---|
+| `DEBUG` | Detailed diagnostic information plus all higher-severity entries |
+| `INFO` | Normal startup and operational events plus warnings and errors; this is the default |
+| `WARNING` | Potential problems plus errors and critical failures |
+| `ERROR` | Errors and critical failures |
+| `CRITICAL` | Only the most severe failures |
+
+Edit the installation's `.env` file rather than running a temporary `export` command:
+
+```dotenv
+LOG_LEVEL=DEBUG
+LOG_MAX_BYTES=5242880
+LOG_BACKUP_COUNT=5
+```
+
+`LOG_MAX_BYTES` controls the approximate rotation size of both active log files.
+`LOG_BACKUP_COUNT` controls how many older numbered copies are retained. After editing `.env`,
+recreate the containers.
+
+Source installation:
+
+```bash
+cd /taskcentral
+docker compose up -d --force-recreate backend frontend
+```
+
+Release-bundle installation:
+
+```bash
+cd /path/to/taskcentral
+docker compose --env-file .env -f compose.yml up -d --force-recreate backend frontend
+```
+
+Changing `LOG_LEVEL` does not require rebuilding an image and does not alter the database.
+
 ## Troubleshooting
 
 ### The page does not open
@@ -1734,7 +1937,7 @@ Check containers:
 ```bash
 cd /taskcentral
 docker compose ps
-docker compose logs --tail=100 frontend backend
+tail -n 100 logs/frontend.log logs/taskcentral.log
 ```
 
 If port 8484 is occupied, choose another host port in `.env`:
@@ -1754,7 +1957,8 @@ docker compose up -d
 Nginx cannot reach a healthy backend. Inspect:
 
 ```bash
-docker compose logs --tail=200 backend
+tail -n 200 logs/frontend.log
+tail -n 200 logs/taskcentral.log
 docker compose ps
 ```
 
@@ -1889,7 +2093,7 @@ The test button uses unsaved form values, but scheduled alerts use saved values.
 ### Local AI connection test fails
 
 - Confirm the local model server is running and the named model is installed or loaded.
-- Use the exact model tag or identifier exposed by the server.
+- Select **Refresh** and choose the exact model tag or identifier reported by the server.
 - For Ollama, configure the root URL such as `http://host.docker.internal:11434`; do not append
   `/api/chat`.
 - For an OpenAI-compatible server, include `/v1` when its API requires it.
@@ -1905,6 +2109,27 @@ The test button uses unsaved form values, but scheduled alerts use saved values.
   ```bash
   docker compose logs --tail=200 backend
   ```
+
+### Local AI model dropdown does not load
+
+- Confirm the base URL is complete and uses `http://` or `https://`.
+- Remember that the model list is requested by the Task Central backend container, not by the
+  browser. Browser access to the Ollama welcome page does not prove container access.
+- For Ollama, verify `http://OLLAMA-IP:11434/api/tags` is reachable from the backend container.
+- For an OpenAI-compatible provider, verify its `/models` endpoint is enabled and include `/v1`
+  in the base URL when required.
+- Check routing, VLAN rules, and firewalls between the Task Central and model-server hosts.
+- Confirm the optional API key is correct, then select **Refresh**.
+
+### A machine is shown as Offline but is running
+
+- The indicator measures ICMP ping response, not application or service health.
+- Confirm the stored machine IP is correct.
+- Permit ICMP echo between the Task Central backend container and the target network if desired.
+- Check Docker networking, VLAN routing, and host/network firewalls.
+- Use the refresh button beside the indicator after changing network rules.
+- If ICMP is intentionally blocked, treat Offline as “no ping response,” not proof that the device
+  is powered off.
 
 ### Chat says Setup required
 
@@ -1992,7 +2217,8 @@ Inside the backend container it is mounted at:
 ```
 
 Application settings are stored as JSON-encoded values in a key/value table. Internal settings,
-such as the password hash and last alert time, are not exposed on the normal Settings API.
+such as the password hash, last alert time, and `changelog_seen_version`, are not exposed on the
+normal Settings API.
 
 ### Data relationships
 
@@ -2055,11 +2281,17 @@ An AI using this manual should follow these support principles:
 11. For release installations, prefer `backup.sh`, `update.sh`, and `restore.sh` over manual
     database copying or direct Compose changes.
 12. When diagnosing a failure, ask for the exact page/action, HTTP status or UI message, relevant
-    container logs, deployment method, database type, and recent changes.
+    entries from `logs/taskcentral.log` or `logs/frontend.log`, deployment method, database type,
+    and recent changes. Use Docker console logs only as a fallback.
 13. When documentation and observed behavior conflict, prioritize the known current-version
     caveats and source-backed behavior in this manual.
+14. Do not speculate about logging. State that backend logging uses Python's built-in `logging`
+    module, give the exact project-relative `logs/` paths, and explain that `LOG_LEVEL` affects the
+    backend while nginx records warnings and errors separately.
 15. For high-risk recovery steps, state what will be replaced, what will be retained, and how to
     roll back before presenting the command.
+16. For changelog questions, distinguish the automatic one-time current-version popup from the
+    permanent sidebar button. Do not claim that the modal displays the full changelog history.
 
 When uncertain, an AI should say what is known, identify the missing evidence, and suggest a
 read-only diagnostic before proposing changes.

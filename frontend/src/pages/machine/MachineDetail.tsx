@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import { Archive, ArchiveRestore, Copy, Pencil } from "lucide-react";
+import { Archive, ArchiveRestore, Copy, Loader2, Pencil, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { StatusBadge, TagBadge, TypeBadge } from "@/components/ui/Badge";
+import { TagBadge, TypeBadge } from "@/components/ui/Badge";
 import { ProgressBar } from "@/components/ui/Progress";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { ConfirmDialog } from "@/components/ui/Dialog";
@@ -12,8 +12,8 @@ import { ErrorState, LoadingState } from "@/components/ui/State";
 import { useToast } from "@/components/ui/Toast";
 import { DuplicateDialog } from "@/components/machine/DuplicateDialog";
 import { api } from "@/lib/api";
-import { useInvalidateMachine, useMachine } from "@/lib/queries";
-import { cn } from "@/lib/utils";
+import { useInvalidateMachine, useMachine, useMachineConnectivity } from "@/lib/queries";
+import { cn, formatDateTime } from "@/lib/utils";
 import { EditMachineDialog } from "./EditMachineDialog";
 import { OverviewTab } from "./OverviewTab";
 import { ChecklistTab } from "./ChecklistTab";
@@ -74,6 +74,11 @@ export function MachineDetail() {
   const tab = (params.tab as TabKey) || "overview";
   const navigate = useNavigate();
   const { data: machine, isLoading, isError, error, refetch } = useMachine(id);
+  const {
+    data: connectivity,
+    isFetching: connectivityChecking,
+    refetch: refreshConnectivity,
+  } = useMachineConnectivity(id, Boolean(machine?.ip_address));
   const [editing, setEditing] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
@@ -110,7 +115,48 @@ export function MachineDetail() {
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-xl font-semibold tracking-tight">{machine.name}</h2>
                 <TypeBadge type={machine.machine_type} />
-                <StatusBadge status={machine.status} />
+                {machine.ip_address ? (
+                  <div className="flex items-center gap-0.5">
+                    <span
+                      className={cn(
+                        "text-xs font-medium",
+                        connectivity?.status === "online"
+                          ? "text-ok"
+                          : "text-accent-hover",
+                      )}
+                      title={
+                        connectivity
+                          ? `${connectivity.message} Checked ${formatDateTime(connectivity.checked_at)}`
+                          : "Checking ICMP reachability from the Task Central backend."
+                      }
+                    >
+                      {connectivity?.status === "online" ? "Online" : "Offline"}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => void refreshConnectivity()}
+                      disabled={connectivityChecking}
+                      aria-label="Ping machine again"
+                      title="Ping machine again"
+                      className="h-6 w-6"
+                    >
+                      {connectivityChecking ? (
+                        <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                      ) : (
+                        <RefreshCw className="h-3 w-3" aria-hidden />
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <span
+                    className="text-xs font-medium text-accent-hover"
+                    title="No IP address is configured, so Task Central cannot ping this machine."
+                  >
+                    Offline
+                  </span>
+                )}
                 {machine.archived_at && (
                   <span className="text-xs text-faint">(archived)</span>
                 )}

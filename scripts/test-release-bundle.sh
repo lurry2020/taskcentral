@@ -82,7 +82,7 @@ APP_PORT=8588 "$INSTALL_DIR/install.sh"
 [[ "$(awk -F= '$1 == "TASKCENTRAL_VERSION" {print $2}' "$INSTALL_DIR/.env")" == "1.0.0" ]]
 [[ "$(awk -F= '$1 == "SECRET_KEY" {print length($2)}' "$INSTALL_DIR/.env")" == "64" ]]
 [[ "$(awk -F= '$1 == "AUTH_PASSWORD" {print length($2)}' "$INSTALL_DIR/.env")" == "64" ]]
-[[ -d "$INSTALL_DIR/data" && -d "$INSTALL_DIR/backups" ]]
+[[ -d "$INSTALL_DIR/data" && -d "$INSTALL_DIR/backups" && -d "$INSTALL_DIR/logs" ]]
 
 "$INSTALL_DIR/update.sh"
 [[ "$(awk -F= '$1 == "TASKCENTRAL_VERSION" {print $2}' "$INSTALL_DIR/.env")" == "1.1.0" ]]
@@ -91,7 +91,7 @@ compgen -G "$INSTALL_DIR/backups/taskcentral-*.db" >/dev/null
 "$INSTALL_DIR/backup.sh"
 "$INSTALL_DIR/uninstall.sh"
 [[ -f "$INSTALL_DIR/.env" ]]
-[[ -d "$INSTALL_DIR/data" && -d "$INSTALL_DIR/backups" ]]
+[[ -d "$INSTALL_DIR/data" && -d "$INSTALL_DIR/backups" && -d "$INSTALL_DIR/logs" ]]
 
 grep -q "compose .* pull" "$COMMAND_LOG"
 grep -q "ghcr.io/example/taskcentral-backend:1.1.0" "$COMMAND_LOG"

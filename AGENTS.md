@@ -17,6 +17,9 @@ root (`/taskcentral`).
   Query, React Hook Form + Zod, Lucide icons. Built to static files served by **nginx on `:8484`**,
   which reverse-proxies `/api` → `backend:8000` (see `frontend/nginx.conf`).
 - **DB:** SQLite at `./data/taskcentral.db` (bind-mounted). Swap to Postgres via `DATABASE_URL`.
+- **Logs:** persistent diagnostics are bind-mounted at `./logs/`. `taskcentral.log` contains backend,
+  integration, startup, and failed-request entries; `frontend.log` contains nginx proxy/server
+  errors. Both rotate by size and keep numbered backups.
 - **Deploy:** `docker-compose.yml` (services `backend`, `frontend`). Backend container CMD runs
   `alembic upgrade head` then uvicorn, so **migrations apply on startup**.
 - **End-user releases:** `release/compose.yml` uses prebuilt, pinned GHCR images. The release
@@ -24,7 +27,8 @@ root (`/taskcentral`).
   validates the repository and publishes `amd64`/`arm64` images plus a versioned GitHub Release.
   `backend/Dockerfile.release` uses the repository root as build context so `MANUAL.md` is baked
   into the backend image and updates with each release.
-- **No extra runtime deps beyond requirements.txt** — Telegram + auth + CLI all use stdlib.
+- **Runtime dependency:** backend images install `iputils-ping` for machine reachability checks.
+  Telegram + auth + CLI otherwise use stdlib beyond requirements.txt.
 
 ### Common commands
 ```bash
@@ -66,6 +70,8 @@ release/
   backup.sh            SQLite online backup through the backend container
   restore.sh           Confirmed restore with an automatic safety backup
   uninstall.sh         Safe container removal; data deletion requires an explicit option
+logs/
+  .gitkeep             Host-readable rotating runtime logs are written here by Compose
 .github/workflows/
   ci.yml               Backend/frontend/release-file checks
   release.yml          Multi-architecture GHCR images, attestations, bundle, and GitHub Release
@@ -105,6 +111,15 @@ named `CHECK` constraints (widened over time via batch migrations).
   `Dependency(type="Host")` created automatically, so the host's "machines that depend on me" and
   its Obsidian doc list its guests. See `services/hosts.py` (`sync_host_dependency`,
   `link_existing_guests`), invoked from `create_machine`/`update_machine`.
+- **Machine reachability.** `services/connectivity.py::ping_ip_address` invokes `iputils-ping`
+  without a shell and only against the validated IP stored on the machine. The authenticated
+  `/machines/{id}/connectivity` endpoint is polled every 30 seconds by `MachineDetail.tsx`.
+  “Offline” means no ICMP reply and does not prove the host is powered off.
+- **Versioned changelog.** `services/changelog.py` selects only the running
+  `TASKCENTRAL_VERSION` section from root `CHANGELOG.md`; release images bake the file into
+  `/app`. `routers/changelog.py` exposes the current entry and stores the internal
+  `changelog_seen_version` acknowledgement. `Layout.tsx` opens it once on `/` after an update and
+  always exposes the sidebar button. First-run setup marks its current version seen.
 - **Obsidian generation.** `services/rendering.py` renders the per-type `ObsidianTemplate` with a
   **sandboxed** Jinja env (`jinja2.sandbox.SandboxedEnvironment`) over a context built in
   `build_context` (machine fields + services/storage/network_devices/network_segments/
@@ -117,6 +132,11 @@ named `CHECK` constraints (widened over time via batch migrations).
   `run_alert_check` (stale pending tasks, respecting a frequency) and `run_reminder_check` (due
   reminders, once per due cycle, gated to a **daily send time in the app timezone**). Config lives
   in application_settings; there's a `POST /settings/test-telegram` for the test button.
+- **Local AI.** `services/llm.py` validates private/local destinations, calls Ollama or an
+  OpenAI-compatible server, discovers models through `/api/tags` or `/models`, and sends chat
+  requests through `/api/chat` or `/chat/completions`. Setup and Settings use separate
+  `/llm-models` endpoints because setup discovery is public only while first-run setup remains
+  incomplete.
 - **Timezone.** One app-wide display timezone (setting `timezone`, default `America/New_York`).
   Frontend: `lib/utils.ts` (`appTimeZone` module cache, synced from settings in `Layout`, parses
   tz-less UTC timestamps by appending `Z`). Backend doc rendering + alert day-rollover use it via
@@ -142,8 +162,9 @@ named `CHECK` constraints (widened over time via batch migrations).
   on success the frontend clears authentication and performs a full navigation to `/setup`.
 
 ## API surface (`/api/v1`, see `routers/__init__.py`)
-`setup` (status/complete/integration tests), `auth` (login/me), `health`, `dashboard`,
-`machines` (CRUD + `/duplicate` `/archive` `/unarchive`
+`setup` (status/complete/integration tests/model discovery), `auth` (login/me), `health`,
+`changelog` (current/seen), `dashboard`,
+`machines` (CRUD + `/duplicate` `/archive` `/unarchive` `/connectivity`
 `/validate` `/hosts` `/tags` `/activity`), `tasks`, `reminders`, `services`, `storage`,
 `network` (devices + segments), `dependencies`, `notes`, `task_templates`, `reminder_templates`,
 `obsidian_templates` (+ `/preview` `/variables` `/{id}/reset`), `documents`

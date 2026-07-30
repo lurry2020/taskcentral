@@ -13,6 +13,7 @@ from app.models import (
     ReminderTemplate,
     TaskTemplate,
 )
+from app.config import get_settings
 from app.services.auth import set_login_username, set_password
 
 SETUP_COMPLETED_KEY = "setup_completed"
@@ -102,6 +103,14 @@ def complete_setup(db: Session, payload) -> None:
             _write_setting(db, "llm_model", payload.llm_model.strip())
             _write_setting(db, "llm_api_key", payload.llm_api_key.strip())
             _write_setting(db, "llm_timeout_seconds", payload.llm_timeout_seconds)
+
+        # A brand-new installation has not been updated, so do not present the
+        # current release as an upgrade immediately after first-run setup.
+        _write_setting(
+            db,
+            "changelog_seen_version",
+            get_settings().taskcentral_version,
+        )
 
         # Write this last so a failed transaction can never leave setup closed
         # with only part of the requested configuration applied.

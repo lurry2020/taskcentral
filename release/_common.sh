@@ -6,6 +6,7 @@ ENV_FILE="$SCRIPT_DIR/.env"
 ENV_TEMPLATE="$SCRIPT_DIR/.env.example"
 DATA_DIR="$SCRIPT_DIR/data"
 BACKUP_DIR="$SCRIPT_DIR/backups"
+LOG_DIR="$SCRIPT_DIR/logs"
 LOCK_DIR="$SCRIPT_DIR/.taskcentral-operation.lock"
 
 info() {

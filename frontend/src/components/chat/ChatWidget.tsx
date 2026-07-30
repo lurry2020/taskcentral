@@ -1,12 +1,33 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+} from "react";
 import { Link } from "react-router-dom";
-import { Bot, Loader2, MessageCircle, Minus, Send, Settings, Trash2 } from "lucide-react";
+import {
+  Bot,
+  Loader2,
+  MessageCircle,
+  Minus,
+  MoveDiagonal2,
+  Send,
+  Settings,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Markdown } from "@/components/ui/Markdown";
 import { api } from "@/lib/api";
 import { useSettings } from "@/lib/queries";
+import {
+  DEFAULT_CHAT_SIZE,
+  constrainChatSize,
+  type ChatSize,
+} from "./chatSize";
 
 const CHAT_OPEN_KEY = "taskcentral-chat-open";
+const CHAT_SIZE_KEY = "taskcentral-chat-size";
 
 interface ChatMessage {
   id: number;
@@ -22,14 +43,58 @@ function initialOpenState(): boolean {
   }
 }
 
+function initialChatSize(): ChatSize {
+  const fallback = constrainChatSize(
+    DEFAULT_CHAT_SIZE,
+    window.innerWidth,
+    window.innerHeight,
+  );
+  try {
+    const saved = JSON.parse(localStorage.getItem(CHAT_SIZE_KEY) ?? "null") as
+      | Partial<ChatSize>
+      | null;
+    if (
+      saved &&
+      Number.isFinite(saved.width) &&
+      Number.isFinite(saved.height)
+    ) {
+      return constrainChatSize(
+        { width: Number(saved.width), height: Number(saved.height) },
+        window.innerWidth,
+        window.innerHeight,
+      );
+    }
+  } catch {
+    // Use the bounded default when storage is unavailable or malformed.
+  }
+  return fallback;
+}
+
+function persistChatSize(size: ChatSize): void {
+  try {
+    localStorage.setItem(CHAT_SIZE_KEY, JSON.stringify(size));
+  } catch {
+    // Storage can be unavailable in private or locked-down browser contexts.
+  }
+}
+
 export function ChatWidget() {
   const [open, setOpen] = useState(initialOpenState);
+  const [chatSize, setChatSize] = useState(initialChatSize);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nextId = useRef(1);
   const endRef = useRef<HTMLDivElement>(null);
+  const chatSizeRef = useRef(chatSize);
+  const resizeStart = useRef<{
+    pointerX: number;
+    pointerY: number;
+    size: ChatSize;
+    previousCursor: string;
+    previousUserSelect: string;
+  } | null>(null);
   const { data: settings } = useSettings();
 
   const configured = Boolean(
@@ -47,6 +112,87 @@ export function ChatWidget() {
   useEffect(() => {
     if (open) endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, sending, open]);
+
+  useEffect(() => {
+    const fitToViewport = () => {
+      const next = constrainChatSize(
+        chatSizeRef.current,
+        window.innerWidth,
+        window.innerHeight,
+      );
+      chatSizeRef.current = next;
+      setChatSize(next);
+    };
+    window.addEventListener("resize", fitToViewport);
+    return () => {
+      window.removeEventListener("resize", fitToViewport);
+      const activeResize = resizeStart.current;
+      if (activeResize) {
+        document.body.style.cursor = activeResize.previousCursor;
+        document.body.style.userSelect = activeResize.previousUserSelect;
+      }
+    };
+  }, []);
+
+  const applyChatSize = (size: ChatSize, persist = false) => {
+    const next = constrainChatSize(size, window.innerWidth, window.innerHeight);
+    chatSizeRef.current = next;
+    setChatSize(next);
+    if (persist) persistChatSize(next);
+  };
+
+  const beginResize = (event: PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    resizeStart.current = {
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      size: chatSizeRef.current,
+      previousCursor: document.body.style.cursor,
+      previousUserSelect: document.body.style.userSelect,
+    };
+    document.body.style.cursor = "nwse-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  const continueResize = (event: PointerEvent<HTMLButtonElement>) => {
+    const start = resizeStart.current;
+    if (!start) return;
+    applyChatSize({
+      width: start.size.width + start.pointerX - event.clientX,
+      height: start.size.height + start.pointerY - event.clientY,
+    });
+  };
+
+  const finishResize = (event: PointerEvent<HTMLButtonElement>) => {
+    const start = resizeStart.current;
+    if (!start) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    document.body.style.cursor = start.previousCursor;
+    document.body.style.userSelect = start.previousUserSelect;
+    resizeStart.current = null;
+    persistChatSize(chatSizeRef.current);
+  };
+
+  const resizeWithKeyboard = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const step = event.shiftKey ? 32 : 16;
+    let next: ChatSize | null = null;
+    if (event.key === "ArrowLeft") {
+      next = { ...chatSizeRef.current, width: chatSizeRef.current.width + step };
+    } else if (event.key === "ArrowRight") {
+      next = { ...chatSizeRef.current, width: chatSizeRef.current.width - step };
+    } else if (event.key === "ArrowUp") {
+      next = { ...chatSizeRef.current, height: chatSizeRef.current.height + step };
+    } else if (event.key === "ArrowDown") {
+      next = { ...chatSizeRef.current, height: chatSizeRef.current.height - step };
+    }
+    if (next) {
+      event.preventDefault();
+      applyChatSize(next, true);
+    }
+  };
 
   const sendMessage = async () => {
     const content = draft.trim();
@@ -92,10 +238,24 @@ export function ChatWidget() {
   return (
     <section
       id="taskcentral-chat"
-      className="pop-in fixed bottom-4 right-4 z-40 flex h-[24rem] max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-[20rem] flex-col overflow-hidden rounded-2xl bg-surface shadow-(--shadow-pop) ring-1 ring-line-strong"
+      className="pop-in fixed bottom-4 right-4 z-40 flex flex-col overflow-hidden rounded-2xl bg-surface shadow-(--shadow-pop) ring-1 ring-line-strong"
+      style={{ width: chatSize.width, height: chatSize.height }}
       aria-label="Task Central chat"
     >
-      <header className="flex h-13 shrink-0 items-center gap-3 border-b border-border bg-surface-2 px-3.5">
+      <button
+        type="button"
+        onPointerDown={beginResize}
+        onPointerMove={continueResize}
+        onPointerUp={finishResize}
+        onPointerCancel={finishResize}
+        onKeyDown={resizeWithKeyboard}
+        className="absolute left-0 top-0 z-10 flex h-7 w-7 touch-none cursor-nwse-resize items-center justify-center rounded-br-lg text-faint transition-colors hover:bg-fill-hover hover:text-muted focus-visible:bg-fill-hover focus-visible:text-text focus-visible:outline-none"
+        aria-label="Resize chat window"
+        title="Drag to resize chat"
+      >
+        <MoveDiagonal2 className="h-3.5 w-3.5" aria-hidden />
+      </button>
+      <header className="flex h-13 shrink-0 items-center gap-3 border-b border-border bg-surface-2 pl-8 pr-3.5">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent-hover">
           <Bot className="h-4 w-4" aria-hidden />
         </div>

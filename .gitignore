@@ -10,5 +10,7 @@ data/*.db-*
 .vite/
 backups/
 release-dist/
+logs/*
+!logs/.gitkeep
 
 *.tsbuildinfo

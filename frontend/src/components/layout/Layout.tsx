@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   BellRing,
   FileCode2,
@@ -8,15 +8,21 @@ import {
   LogOut,
   Menu,
   Plus,
+  ScrollText,
   Server,
   Settings,
   X,
 } from "lucide-react";
 import { cn, setAppTimeZone } from "@/lib/utils";
-import { useSettings } from "@/lib/queries";
+import {
+  useCurrentChangelog,
+  useMarkCurrentChangelogSeen,
+  useSettings,
+} from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
 import { ChatWidget } from "@/components/chat/ChatWidget";
+import { ChangelogDialog } from "@/components/ChangelogDialog";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -89,14 +95,45 @@ function Brand() {
 
 export function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [changelogOpen, setChangelogOpen] = useState(false);
+  const autoOpenedVersion = useRef<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: settings } = useSettings();
+  const {
+    data: changelog,
+    isLoading: changelogLoading,
+    error: changelogError,
+    refetch: refetchChangelog,
+  } = useCurrentChangelog();
+  const markChangelogSeen = useMarkCurrentChangelogSeen();
   const { username, logout } = useAuth();
 
   // Keep the app-wide display timezone in sync with the backend setting.
   useEffect(() => {
     if (settings?.timezone) setAppTimeZone(settings.timezone);
   }, [settings?.timezone]);
+
+  useEffect(() => {
+    if (
+      location.pathname !== "/" ||
+      !changelog?.available ||
+      changelog.seen ||
+      autoOpenedVersion.current === changelog.version
+    ) {
+      return;
+    }
+    autoOpenedVersion.current = changelog.version;
+    setChangelogOpen(true);
+    markChangelogSeen.mutate();
+  }, [changelog, location.pathname, markChangelogSeen]);
+
+  const showChangelog = () => {
+    setChangelogOpen(true);
+    if (changelog?.available && !changelog.seen && !markChangelogSeen.isPending) {
+      markChangelogSeen.mutate();
+    }
+  };
 
   return (
     <div className="flex min-h-screen">
@@ -105,6 +142,13 @@ export function Layout() {
         <Brand />
         <NavLinks />
         <div className="mt-auto border-t border-border px-3 py-3">
+          <button
+            onClick={showChangelog}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[0.83rem] font-medium text-muted transition-colors hover:bg-fill-hover hover:text-text"
+          >
+            <ScrollText className="h-4 w-4 shrink-0 text-faint" aria-hidden />
+            <span className="min-w-0 flex-1 text-left">Changelog</span>
+          </button>
           <button
             onClick={logout}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[0.83rem] font-medium text-muted transition-colors hover:bg-fill-hover hover:text-text"
@@ -137,6 +181,18 @@ export function Layout() {
               </Button>
             </div>
             <NavLinks onNavigate={() => setDrawerOpen(false)} />
+            <div className="mt-auto border-t border-border px-3 py-3">
+              <button
+                onClick={() => {
+                  setDrawerOpen(false);
+                  showChangelog();
+                }}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[0.83rem] font-medium text-muted transition-colors hover:bg-fill-hover hover:text-text"
+              >
+                <ScrollText className="h-4 w-4 shrink-0 text-faint" aria-hidden />
+                Changelog
+              </button>
+            </div>
           </aside>
         </div>
       )}
@@ -176,6 +232,14 @@ export function Layout() {
         </main>
       </div>
       <ChatWidget />
+      <ChangelogDialog
+        open={changelogOpen}
+        onClose={() => setChangelogOpen(false)}
+        changelog={changelog}
+        isLoading={changelogLoading}
+        error={changelogError as Error | null}
+        onRetry={() => void refetchChangelog()}
+      />
     </div>
   );
 }

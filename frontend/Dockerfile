@@ -11,6 +11,10 @@ FROM nginx:1.27-alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY log-rotator.sh /docker-entrypoint.d/40-taskcentral-log-rotation.sh
+
+RUN mkdir -p /logs \
+    && chmod 755 /docker-entrypoint.d/40-taskcentral-log-rotation.sh
 
 EXPOSE 80
 

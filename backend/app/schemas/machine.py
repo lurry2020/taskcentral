@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -283,6 +284,14 @@ class MachineOut(MachineBase, ORMModel):
     @classmethod
     def _tag_names(cls, v):
         return [t.name if hasattr(t, "name") else t for t in v]
+
+
+class MachineConnectivity(BaseModel):
+    status: Literal["online", "offline", "unknown"]
+    ip_address: str | None
+    checked_at: datetime
+    latency_ms: float | None = None
+    message: str
 
 
 class DuplicateRequest(BaseModel):
