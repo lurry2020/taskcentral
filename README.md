@@ -37,10 +37,6 @@ one-click Obsidian-ready Markdown document for your vault.
 - **Version-aware changelog** — after an update, the Dashboard shows the current release notes
   once automatically; the sidebar Changelog button reopens them at any time.
 
-## Screenshots
-
-_(add screenshots here)_
-
 ## Technology stack
 
 | Layer      | Choice                                                        |
@@ -90,14 +86,12 @@ _(add screenshots here)_
 ```
 
 # Installation
-
 ## Dependencies
 Make sure the following are installed:
 - Docker Engine
 - Docker Compose v2
 - curl
 - tar
-
 ---
 
 ## Install
