@@ -89,16 +89,30 @@ _(add screenshots here)_
 └── README.md
 ```
 
-## Recommended installation
+# Installation
 
-Users install Task Central from a prebuilt GitHub release. Docker Engine with the Docker Compose
-v2 plugin is the only runtime prerequisite.
+## Dependencies
+Make sure the following are installed:
+- Docker Engine
+- Docker Compose v2
+- curl
+- tar
 
-1. Download `taskcentral-VERSION.tar.gz` from the repository's Releases page.
-2. Extract it and enter the extracted directory.
-3. Run:
+---
+
+## Install
 
 ```bash
+mkdir taskcentral
+cd taskcentral
+
+taskcentral_version=$(curl -fsSL https://github.com/lurry2020/taskcentral/releases/latest/download/VERSION)
+
+curl -fLO "https://github.com/lurry2020/taskcentral/releases/download/v${taskcentral_version}/taskcentral-${taskcentral_version}.tar.gz"
+
+tar -xzf "taskcentral-${taskcentral_version}.tar.gz"
+cd "taskcentral-${taskcentral_version}"
+
 ./install.sh
 ```
 
