@@ -11,6 +11,7 @@ export function Dialog({
   children,
   footer,
   wide,
+  centerTitle,
 }: {
   open: boolean;
   onClose: () => void;
@@ -19,6 +20,7 @@ export function Dialog({
   children?: ReactNode;
   footer?: ReactNode;
   wide?: boolean;
+  centerTitle?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -56,12 +58,23 @@ export function Dialog({
           wide ? "max-w-3xl" : "max-w-lg",
         )}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
-          <div>
+        <div
+          className={cn(
+            "relative flex items-start gap-3 border-b border-border px-5 py-4",
+            centerTitle ? "justify-center text-center" : "justify-between",
+          )}
+        >
+          <div className={cn(centerTitle && "px-10")}>
             <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
             {description && <p className="mt-0.5 text-xs leading-relaxed text-muted">{description}</p>}
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close dialog">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label="Close dialog"
+            className={cn(centerTitle && "absolute right-3 top-1/2 -translate-y-1/2")}
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>

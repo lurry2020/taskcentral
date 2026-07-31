@@ -55,6 +55,8 @@ curl -fsSL https://github.com/lurry2020/taskcentral/releases/latest/download/tas
 
 After the next login and Dashboard visit, Task Central shows that version's release notes once.
 Use the **Changelog** button at the bottom of the sidebar to reopen them later.
+Tabs that were open during the update display **Reload Task Central** after detecting the new
+running version. HTML entry responses are not cached, so a normal reload is sufficient.
 
 ## Back up and restore
 
@@ -121,6 +123,7 @@ The installer writes `.env` with permissions limited to the current user. Common
 | `APP_NAME` | Application name |
 | `TASKCENTRAL_VERSION` | Pinned container release |
 | `TASKCENTRAL_IMAGE_PREFIX` | Container registry and owner |
+| `TASKCENTRAL_RELEASE_REPOSITORY` | GitHub repository used for version checks and updates |
 | `LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, or `ERROR` |
 | `LOG_MAX_BYTES` | Rotation size for each local log file; default `5242880` |
 | `LOG_BACKUP_COUNT` | Number of older log files retained; default `5` |

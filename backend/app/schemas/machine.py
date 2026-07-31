@@ -294,6 +294,10 @@ class MachineConnectivity(BaseModel):
     message: str
 
 
+class MachineConnectivityListItem(MachineConnectivity):
+    machine_id: int
+
+
 class DuplicateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     copy_services: bool = True

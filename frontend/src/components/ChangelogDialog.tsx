@@ -29,12 +29,8 @@ export function ChangelogDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      title="What's New in Task Central"
-      description={
-        versionLabel
-          ? `${versionLabel}${changelog?.released_at ? ` · ${changelog.released_at}` : ""}`
-          : "Current release notes"
-      }
+      title="Task Central Changelog"
+      description={versionLabel ? `${versionLabel} · Newest releases first` : "Newest releases first"}
       wide
     >
       {isLoading ? (
@@ -42,7 +38,9 @@ export function ChangelogDialog({
       ) : error ? (
         <ErrorState message={error.message} onRetry={onRetry} />
       ) : changelog?.available ? (
-        <Markdown content={changelog.content} />
+        <div className="max-h-[65vh] overflow-y-auto overscroll-contain pr-2">
+          <Markdown content={changelog.content} />
+        </div>
       ) : (
         <p className="py-8 text-center text-sm text-muted">
           No changelog notes are available for this version.

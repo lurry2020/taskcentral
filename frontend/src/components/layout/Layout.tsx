@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   BellRing,
+  CircleArrowUp,
   FileCode2,
   LayoutDashboard,
   ListChecks,
   LogOut,
   Menu,
   Plus,
+  PackageCheck,
   ScrollText,
   Server,
   Settings,
@@ -18,11 +20,14 @@ import {
   useCurrentChangelog,
   useMarkCurrentChangelogSeen,
   useSettings,
+  useVersionStatus,
 } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
+import { FRONTEND_BUILD_VERSION, runningVersionDiffers } from "@/lib/buildVersion";
 import { Button } from "@/components/ui/Button";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { ChangelogDialog } from "@/components/ChangelogDialog";
+import { VersionDialog } from "@/components/VersionDialog";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -93,9 +98,42 @@ function Brand() {
   );
 }
 
+function VersionButton({
+  version,
+  updateAvailable,
+  onClick,
+}: {
+  version: string;
+  updateAvailable: boolean;
+  onClick: () => void;
+}) {
+  const Icon = updateAvailable ? CircleArrowUp : PackageCheck;
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[0.83rem] font-medium transition-colors hover:bg-fill-hover hover:text-text",
+        updateAvailable ? "text-accent-hover" : "text-muted",
+      )}
+    >
+      <Icon
+        className={cn("h-4 w-4 shrink-0", updateAvailable ? "text-accent" : "text-faint")}
+        aria-hidden
+      />
+      <span className="min-w-0 flex-1 truncate text-left">Version {version}</span>
+      {updateAvailable && (
+        <span className="rounded-md bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-hover">
+          Update
+        </span>
+      )}
+    </button>
+  );
+}
+
 export function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
+  const [versionOpen, setVersionOpen] = useState(false);
   const autoOpenedVersion = useRef<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -106,6 +144,13 @@ export function Layout() {
     error: changelogError,
     refetch: refetchChangelog,
   } = useCurrentChangelog();
+  const {
+    data: versionStatus,
+    isLoading: versionLoading,
+    isFetching: versionRefreshing,
+    error: versionError,
+    refetch: refetchVersion,
+  } = useVersionStatus();
   const markChangelogSeen = useMarkCurrentChangelogSeen();
   const { username, logout } = useAuth();
 
@@ -134,6 +179,12 @@ export function Layout() {
       markChangelogSeen.mutate();
     }
   };
+  const installedVersion = versionStatus?.current_version ?? changelog?.version ?? "…";
+  const updateAvailable = versionStatus?.status === "update_available";
+  const reloadRequired = runningVersionDiffers(
+    FRONTEND_BUILD_VERSION,
+    versionStatus?.current_version,
+  );
 
   return (
     <div className="flex min-h-screen">
@@ -142,6 +193,11 @@ export function Layout() {
         <Brand />
         <NavLinks />
         <div className="mt-auto border-t border-border px-3 py-3">
+          <VersionButton
+            version={installedVersion}
+            updateAvailable={updateAvailable}
+            onClick={() => setVersionOpen(true)}
+          />
           <button
             onClick={showChangelog}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[0.83rem] font-medium text-muted transition-colors hover:bg-fill-hover hover:text-text"
@@ -182,6 +238,14 @@ export function Layout() {
             </div>
             <NavLinks onNavigate={() => setDrawerOpen(false)} />
             <div className="mt-auto border-t border-border px-3 py-3">
+              <VersionButton
+                version={installedVersion}
+                updateAvailable={updateAvailable}
+                onClick={() => {
+                  setDrawerOpen(false);
+                  setVersionOpen(true);
+                }}
+              />
               <button
                 onClick={() => {
                   setDrawerOpen(false);
@@ -225,6 +289,26 @@ export function Layout() {
             <LogOut className="h-4.5 w-4.5" />
           </Button>
         </header>
+        {reloadRequired && (
+          <div
+            className="sticky top-14 z-10 border-b border-accent/20 bg-accent-soft px-4 py-2.5 backdrop-blur-xl sm:px-6"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <CircleArrowUp className="h-4 w-4 shrink-0 text-accent-hover" aria-hidden />
+                <p className="text-xs leading-relaxed text-text">
+                  Task Central {versionStatus?.current_version} is now running. This tab still has
+                  version {FRONTEND_BUILD_VERSION} loaded.
+                </p>
+              </div>
+              <Button size="sm" variant="primary" onClick={() => window.location.reload()}>
+                Reload Task Central
+              </Button>
+            </div>
+          </div>
+        )}
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto w-full max-w-6xl">
             <Outlet />
@@ -239,6 +323,15 @@ export function Layout() {
         isLoading={changelogLoading}
         error={changelogError as Error | null}
         onRetry={() => void refetchChangelog()}
+      />
+      <VersionDialog
+        open={versionOpen}
+        onClose={() => setVersionOpen(false)}
+        version={versionStatus}
+        isLoading={versionLoading}
+        isRefreshing={versionRefreshing && !versionLoading}
+        error={versionError as Error | null}
+        onRetry={() => void refetchVersion()}
       />
     </div>
   );

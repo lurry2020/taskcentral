@@ -13,6 +13,7 @@ import type {
   ImportResult,
   Machine,
   MachineConnectivity,
+  MachineConnectivityListItem,
   MachineListItem,
   MachineReminder,
   MachineTask,
@@ -32,6 +33,7 @@ import type {
   StorageInput,
   TaskTemplate,
   TemplateVariable,
+  VersionStatus,
 } from "./types";
 
 export interface MachineListParams {
@@ -66,6 +68,16 @@ export const useCurrentChangelog = () =>
     staleTime: Infinity,
   });
 
+export const useVersionStatus = () =>
+  useQuery({
+    queryKey: ["version-status"],
+    queryFn: () => api.get<VersionStatus>("/version"),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: false,
+  });
+
 export function useMarkCurrentChangelogSeen() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -97,6 +109,22 @@ export const useMachineConnectivity = (id: number | undefined, enabled: boolean)
     queryKey: ["machine-connectivity", id],
     queryFn: () => api.get<MachineConnectivity>(`/machines/${id}/connectivity`),
     enabled: id !== undefined && enabled,
+    refetchInterval: 30_000,
+    staleTime: 10_000,
+    retry: false,
+  });
+
+export const useMachineConnectivityList = (machineIds: number[]) =>
+  useQuery({
+    queryKey: ["machine-connectivity-list", machineIds],
+    queryFn: () => {
+      const search = new URLSearchParams();
+      machineIds.forEach((machineId) => search.append("machine_ids", String(machineId)));
+      return api.get<MachineConnectivityListItem[]>(
+        `/machines/connectivity?${search.toString()}`,
+      );
+    },
+    enabled: machineIds.length > 0,
     refetchInterval: 30_000,
     staleTime: 10_000,
     retry: false,

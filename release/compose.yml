@@ -6,6 +6,7 @@ services:
       APP_NAME: ${APP_NAME:-Task Central}
       APP_ENV: production
       TASKCENTRAL_VERSION: ${TASKCENTRAL_VERSION}
+      TASKCENTRAL_RELEASE_REPOSITORY: ${TASKCENTRAL_RELEASE_REPOSITORY:-lurry2020/taskcentral}
       CHANGELOG_PATH: /app/CHANGELOG.md
       DATABASE_URL: sqlite:////data/taskcentral.db
       DATA_DIR: /data

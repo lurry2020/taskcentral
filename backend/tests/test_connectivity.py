@@ -1,6 +1,9 @@
 from types import SimpleNamespace
 
+from app.models import Machine
+from app.routers import machines
 from app.services import connectivity
+from app.services.connectivity import PingResult
 
 
 def test_ping_reports_online_and_parses_latency(monkeypatch):
@@ -62,3 +65,32 @@ def test_ping_reports_unknown_when_utility_is_missing(monkeypatch):
 
     assert result.status == "unknown"
     assert "unavailable" in result.message
+
+
+def test_inventory_connectivity_batch_checks_visible_machines(db_session, monkeypatch):
+    db = db_session()
+    try:
+        online = Machine(
+            name="online-machine",
+            machine_type="VM",
+            status="Active",
+            ip_address="192.168.1.20",
+        )
+        no_ip = Machine(name="no-ip-machine", machine_type="VM", status="Active")
+        db.add_all([online, no_ip])
+        db.commit()
+        monkeypatch.setattr(
+            machines,
+            "ping_ip_address",
+            lambda address: PingResult("online", 1.5, f"Reply from {address}."),
+        )
+
+        results = machines.list_machine_connectivity([online.id, no_ip.id], db)
+
+        assert [result.machine_id for result in results] == [online.id, no_ip.id]
+        assert results[0].status == "online"
+        assert results[0].latency_ms == 1.5
+        assert results[1].status == "unknown"
+        assert results[1].ip_address is None
+    finally:
+        db.close()

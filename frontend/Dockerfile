@@ -1,6 +1,9 @@
 ARG BUILDPLATFORM
 FROM --platform=${BUILDPLATFORM} node:20-alpine AS build
 
+ARG TASKCENTRAL_VERSION=dev
+ENV VITE_TASKCENTRAL_VERSION=${TASKCENTRAL_VERSION}
+
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund

@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Literal
 
@@ -21,6 +22,7 @@ from app.schemas.machine import (
     DuplicateRequest,
     MachineCreate,
     MachineConnectivity,
+    MachineConnectivityListItem,
     MachineListItem,
     MachineOut,
     MachineUpdate,
@@ -133,6 +135,58 @@ def list_tags(db: Session = Depends(get_db)):
     return [t.name for t in db.scalars(select(Tag).order_by(Tag.name))]
 
 
+def _connectivity_for_ip(ip_address: str | None) -> MachineConnectivity:
+    checked_at = datetime.now(timezone.utc)
+    if not ip_address:
+        return MachineConnectivity(
+            status="unknown",
+            ip_address=None,
+            checked_at=checked_at,
+            message="No IP address is stored for this machine.",
+        )
+    result = ping_ip_address(ip_address)
+    return MachineConnectivity(
+        status=result.status,
+        ip_address=ip_address,
+        checked_at=checked_at,
+        latency_ms=result.latency_ms,
+        message=result.message,
+    )
+
+
+@router.get("/connectivity", response_model=list[MachineConnectivityListItem])
+def list_machine_connectivity(
+    machine_ids: list[int] = Query(...),
+    db: Session = Depends(get_db),
+):
+    """Ping up to one inventory page of machines concurrently."""
+    if len(machine_ids) > 200 or any(machine_id < 1 for machine_id in machine_ids):
+        raise HTTPException(
+            status_code=422,
+            detail="Provide between 1 and 200 valid machine IDs.",
+        )
+
+    requested_ids = list(dict.fromkeys(machine_ids))
+    stored_ips = dict(
+        db.execute(
+            select(Machine.id, Machine.ip_address).where(Machine.id.in_(requested_ids))
+        ).all()
+    )
+    existing_ids = [machine_id for machine_id in requested_ids if machine_id in stored_ips]
+    if not existing_ids:
+        return []
+
+    def check(machine_id: int) -> MachineConnectivityListItem:
+        result = _connectivity_for_ip(stored_ips[machine_id])
+        return MachineConnectivityListItem(
+            machine_id=machine_id,
+            **result.model_dump(),
+        )
+
+    with ThreadPoolExecutor(max_workers=min(10, len(existing_ids))) as executor:
+        return list(executor.map(check, existing_ids))
+
+
 @router.get("/validate", response_model=ValidationWarnings)
 def validate_machine(
     db: Session = Depends(get_db),
@@ -231,22 +285,7 @@ def get_machine(machine_id: int, db: Session = Depends(get_db)):
 @router.get("/{machine_id}/connectivity", response_model=MachineConnectivity)
 def machine_connectivity(machine_id: int, db: Session = Depends(get_db)):
     machine = get_machine_or_404(db, machine_id)
-    checked_at = datetime.now(timezone.utc)
-    if not machine.ip_address:
-        return MachineConnectivity(
-            status="unknown",
-            ip_address=None,
-            checked_at=checked_at,
-            message="No IP address is stored for this machine.",
-        )
-    result = ping_ip_address(machine.ip_address)
-    return MachineConnectivity(
-        status=result.status,
-        ip_address=machine.ip_address,
-        checked_at=checked_at,
-        latency_ms=result.latency_ms,
-        message=result.message,
-    )
+    return _connectivity_for_ip(machine.ip_address)
 
 
 @router.put("/{machine_id}", response_model=MachineOut)

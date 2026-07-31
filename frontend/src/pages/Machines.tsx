@@ -21,18 +21,67 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Field";
-import { StatusBadge, TagBadge, TypeBadge } from "@/components/ui/Badge";
+import { TagBadge, TypeBadge } from "@/components/ui/Badge";
 import { ChecklistProgressCell } from "@/components/ui/Progress";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/State";
 import { useToast } from "@/components/ui/Toast";
 import { DuplicateDialog } from "@/components/machine/DuplicateDialog";
 import { api } from "@/lib/api";
-import { useHosts, useMachines, useMeta, useSettings, useTags } from "@/lib/queries";
-import type { MachineListItem } from "@/lib/types";
-import { cn, relativeTime } from "@/lib/utils";
+import {
+  useHosts,
+  useMachineConnectivityList,
+  useMachines,
+  useMeta,
+  useSettings,
+  useTags,
+} from "@/lib/queries";
+import type { MachineConnectivity, MachineListItem } from "@/lib/types";
+import { cn, formatDateTime, relativeTime } from "@/lib/utils";
 
 type SortKey = "name" | "created_at" | "updated_at" | "progress";
+
+function MachineState({
+  connectivity,
+  hasIpAddress,
+  checking,
+}: {
+  connectivity?: MachineConnectivity;
+  hasIpAddress: boolean;
+  checking: boolean;
+}) {
+  const online = connectivity?.status === "online";
+  const label = online ? "Online" : "Offline";
+  const title = connectivity
+    ? `${connectivity.message} Checked ${formatDateTime(connectivity.checked_at)}`
+    : hasIpAddress && checking
+      ? "Checking ICMP reachability from the Task Central backend."
+      : hasIpAddress
+        ? "The ping check could not be completed."
+        : "No IP address is configured, so Task Central cannot ping this machine.";
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 text-xs font-medium",
+        online ? "text-ok" : "text-accent-hover",
+      )}
+      title={title}
+      aria-label={`${label}. ${title}`}
+    >
+      <span
+        className={cn(
+          "h-1.5 w-1.5 shrink-0 rounded-full",
+          online
+            ? "bg-ok shadow-[0_0_0_3px_var(--color-ok-soft)]"
+            : "bg-accent shadow-[0_0_0_3px_var(--color-accent-soft)]",
+        )}
+        aria-hidden
+      />
+      {label}
+    </span>
+  );
+}
 
 export function Machines() {
   const [search, setSearch] = useState("");
@@ -68,6 +117,15 @@ export function Machines() {
     [search, machineType, status, host, tag, archived, sortBy, sortDir, page, pageSize],
   );
   const { data, isLoading, isError, error, refetch } = useMachines(params);
+  const visibleMachineIds = useMemo(() => data?.items.map((machine) => machine.id) ?? [], [data]);
+  const {
+    data: connectivityResults,
+    isFetching: connectivityChecking,
+  } = useMachineConnectivityList(visibleMachineIds);
+  const connectivityByMachine = useMemo(
+    () => new Map(connectivityResults?.map((result) => [result.machine_id, result]) ?? []),
+    [connectivityResults],
+  );
   const { data: hosts } = useHosts();
   const { data: tags } = useTags();
   const { data: meta } = useMeta();
@@ -388,7 +446,7 @@ export function Machines() {
                       <th className="px-3 py-2.5 font-medium">Host</th>
                       <th className="px-3 py-2.5 font-medium">IP / DNS</th>
                       <th className="px-3 py-2.5 font-medium">OS</th>
-                      <th className="px-3 py-2.5 font-medium">Status</th>
+                      <th className="px-3 py-2.5 font-medium">State</th>
                       <th className="px-3 py-2.5 font-medium">
                         <SortHeader label="Progress" sortKey="progress" />
                       </th>
@@ -402,18 +460,18 @@ export function Machines() {
                     {data.items.map((m) => (
                       <tr
                         key={m.id}
-                        className="cursor-pointer transition-colors hover:bg-fill-hover"
+                        className="h-20 cursor-pointer align-middle transition-colors hover:bg-fill-hover"
                         onClick={() => navigate(`/inventory/${m.id}`)}
                       >
-                        <td className="px-4 py-3">
-                          <p className="font-medium">{m.name}</p>
-                          {m.tags.length > 0 && (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {m.tags.slice(0, 3).map((t) => (
-                                <TagBadge key={t} tag={t} />
-                              ))}
-                            </div>
-                          )}
+                        <td className="h-20 min-w-64 px-4 py-2">
+                          <p className="truncate font-medium" title={m.name}>
+                            {m.name}
+                          </p>
+                          <div className="mt-1 flex h-6 min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
+                            {m.tags.slice(0, 3).map((t) => (
+                              <TagBadge key={t} tag={t} className="max-w-24 shrink" />
+                            ))}
+                          </div>
                         </td>
                         <td className="px-3 py-3">
                           <TypeBadge type={m.machine_type} />
@@ -421,18 +479,41 @@ export function Machines() {
                             <p className="mt-1 font-mono text-[11px] text-faint">#{m.vmid}</p>
                           )}
                         </td>
-                        <td className="px-3 py-3 text-muted">{m.host ?? "—"}</td>
-                        <td className="px-3 py-3">
-                          <p className="font-mono text-xs">{m.ip_address ?? "—"}</p>
-                          <p className="font-mono text-[11px] text-faint">{m.dns_record ?? ""}</p>
+                        <td
+                          className="max-w-36 truncate px-3 py-3 text-muted"
+                          title={m.host ?? undefined}
+                        >
+                          {m.host ?? "—"}
                         </td>
-                        <td className="px-3 py-3 text-muted">
+                        <td className="max-w-48 px-3 py-3">
+                          <p className="truncate font-mono text-xs" title={m.ip_address ?? undefined}>
+                            {m.ip_address ?? "—"}
+                          </p>
+                          <p
+                            className="truncate font-mono text-[11px] text-faint"
+                            title={m.dns_record ?? undefined}
+                          >
+                            {m.dns_record ?? ""}
+                          </p>
+                        </td>
+                        <td
+                          className="max-w-48 truncate px-3 py-3 text-muted"
+                          title={
+                            m.operating_system
+                              ? `${m.operating_system} ${m.operating_system_version ?? ""}`.trim()
+                              : undefined
+                          }
+                        >
                           {m.operating_system
                             ? `${m.operating_system} ${m.operating_system_version ?? ""}`.trim()
                             : "—"}
                         </td>
                         <td className="px-3 py-3">
-                          <StatusBadge status={m.status} />
+                          <MachineState
+                            connectivity={connectivityByMachine.get(m.id)}
+                            hasIpAddress={Boolean(m.ip_address)}
+                            checking={connectivityChecking}
+                          />
                         </td>
                         <td className="px-3 py-3">
                           <ChecklistProgressCell progress={m.progress} />
@@ -442,7 +523,7 @@ export function Machines() {
                             </p>
                           )}
                         </td>
-                        <td className="px-3 py-3 text-xs text-faint">
+                        <td className="whitespace-nowrap px-3 py-3 text-xs text-faint">
                           {relativeTime(m.updated_at)}
                         </td>
                         <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
@@ -474,7 +555,11 @@ export function Machines() {
                     </div>
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-3">
-                    <StatusBadge status={m.status} />
+                    <MachineState
+                      connectivity={connectivityByMachine.get(m.id)}
+                      hasIpAddress={Boolean(m.ip_address)}
+                      checking={connectivityChecking}
+                    />
                     <ChecklistProgressCell progress={m.progress} />
                   </div>
                 </Card>

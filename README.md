@@ -140,6 +140,8 @@ curl -fsSL https://github.com/lurry2020/taskcentral/releases/latest/download/tas
 ```
 
 After a successful update, the Dashboard presents the current version's changelog once.
+Already-open tabs detect the new running version and display **Reload Task Central**. HTML entry
+responses are not cached, so a normal reload is sufficient; a hard refresh is not required.
 
 See the README inside the release bundle for full operational instructions.
 
@@ -197,6 +199,8 @@ cd frontend && npm run build                       # production build
 | `APP_NAME`     | `Task Central`                   | Display name (also editable in Settings)        |
 | `APP_ENV`      | `production`                     | Environment label                               |
 | `APP_PORT`     | `8484`                           | Host port for the web UI                        |
+| `TASKCENTRAL_VERSION` | `1.1.3`                    | Installed application release                   |
+| `TASKCENTRAL_RELEASE_REPOSITORY` | `lurry2020/taskcentral` | Repository used to check for releases   |
 | `DATABASE_URL` | `sqlite:////data/taskcentral.db` | SQLAlchemy connection string                    |
 | `CORS_ORIGINS` | `http://localhost:8484`          | Comma-separated allowed origins                 |
 | `LOG_LEVEL`    | `INFO`                           | Backend log level                               |
@@ -271,8 +275,8 @@ To publish:
 
 ```bash
 # Example: publish the version recorded in VERSION.
-git tag v1.1.2
-git push origin v1.1.2
+git tag v1.1.3
+git push origin v1.1.3
 ```
 
 The tag must match the root `VERSION` file. The release workflow tests the backend and frontend,

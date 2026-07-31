@@ -73,10 +73,13 @@ export interface MachineConnectivity {
   message: string;
 }
 
+export interface MachineConnectivityListItem extends MachineConnectivity {
+  machine_id: number;
+}
+
 export interface CurrentChangelog {
   version: string;
   display_version: string;
-  released_at: string | null;
   content: string;
   available: boolean;
   seen: boolean;
@@ -85,6 +88,15 @@ export interface CurrentChangelog {
 export interface ChangelogSeen {
   version: string;
   seen: boolean;
+}
+
+export interface VersionStatus {
+  current_version: string;
+  latest_version: string | null;
+  status: "up_to_date" | "update_available" | "check_failed";
+  checked_at: string;
+  releases_url: string;
+  message: string;
 }
 
 export interface MachineListItem {

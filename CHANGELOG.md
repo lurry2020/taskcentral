@@ -3,18 +3,44 @@
 All notable changes to Task Central releases are documented here.
 
 The format follows Keep a Changelog, and release numbers use Semantic Versioning. The application
-displays only the section that belongs to its running version.
+displays the running version and every older release in newest-first order.
 
 ## [Unreleased]
 
-## [1.1.2] - 2026-07-30
+## [1.1.3]
+
+### Added
+
+- A sidebar version indicator and version-status modal that compare the installed release with
+  GitHub's latest Task Central release and link to the GitHub Releases page when an update is
+  available.
+
+### Changed
+
+- The in-app changelog now shows the complete release history in a scrollable modal, with the
+  newest release first and release dates omitted.
+- The Inventory table's Status column is now a live State column. It shows Online or Offline with
+  green or red indicator dots based on backend ICMP ping checks.
+- Desktop Inventory rows now use a consistent height and a single non-wrapping tag line. Only the
+  first three tags are shown, and long tag names are truncated.
+- The version modal now uses a centered title and removes redundant installed-version, check-time,
+  and up-to-date text.
+
+### Fixed
+
+- Frontend HTML responses now disable browser and proxy caching while fingerprinted assets remain
+  cacheable. Open tabs detect a newly running backend version and display a safe reload prompt, so
+  users no longer need a hard refresh after updates.
+- Inventory tag badges now have enough vertical space for their complete border to remain visible.
+
+## [1.1.2]
 
 ### Fixed
 
 - The password-reset CLI now resolves and reports the setup-selected username instead of displaying
   the `AUTH_USERNAME` fallback. Password changes and `--reset` preserve the stored username.
 
-## [1.1.1] - 2026-07-30
+## [1.1.1]
 
 ### Changed
 
@@ -29,7 +55,7 @@ displays only the section that belongs to its running version.
 - Failed updates now restore the previous release-management files along with the prior version
   and pre-update database.
 
-## [1.1.0] - 2026-07-30
+## [1.1.0]
 
 ### Added
 

@@ -21,6 +21,7 @@ from app.routers import (
     storage,
     task_templates,
     tasks,
+    version,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -29,6 +30,7 @@ api_router.include_router(auth.router)
 api_router.include_router(setup.router)
 api_router.include_router(chat.router)
 api_router.include_router(changelog.router)
+api_router.include_router(version.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(machines.router)
 api_router.include_router(tasks.router)

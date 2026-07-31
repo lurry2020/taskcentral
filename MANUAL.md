@@ -4,7 +4,7 @@ This manual is the primary user-facing reference for Task Central. It explains w
 application does, how its workflows behave, how to operate and maintain an installation, and
 which current-version limitations matter when troubleshooting.
 
-It reflects the repository and database behavior reviewed on July 30, 2026. If a later release
+It reflects the repository and database behavior reviewed on July 31, 2026. If a later release
 changes behavior, its release notes and current source take precedence over version-specific
 details here.
 
@@ -39,6 +39,7 @@ Markdown document.
 - [Backup, export, import, and recovery](#backup-export-import-and-recovery)
 - [Installation and deployment](#installation-and-deployment)
 - [Upgrading](#upgrading)
+- [Version and update checking](#version-and-update-checking)
 - [Changelog and What's New](#changelog-and-whats-new)
 - [API access](#api-access)
 - [Security guidance](#security-guidance)
@@ -574,6 +575,23 @@ are available for:
 
 The table can be sorted by name, creation time, update time, or checklist progress. Page size is
 controlled in Settings.
+
+The table's **State** column reports live ICMP reachability instead of the machine's editable
+lifecycle status:
+
+- **Online** with a green dot means the backend container received a ping reply.
+- **Offline** with a red dot means no reply arrived, the ping could not run, or the record has no
+  IP address.
+
+Task Central checks all machines visible on the current inventory page when the page opens and
+refreshes their state every 30 seconds. Hover over a state to see the ping result, check time, and
+round-trip latency when available. Checks run concurrently from the backend container and do not
+store connectivity history. The **Status** filter still filters the editable Draft, In Progress,
+Active, Maintenance, Retired, and Archived lifecycle values.
+
+Desktop inventory rows use a consistent height. Up to the first three tags are displayed on one
+line beneath the machine name; additional tags are hidden from the table, and long visible tag
+names are truncated. Open the machine to view its complete tag list.
 
 ### Duplicating a machine
 
@@ -1543,7 +1561,7 @@ A healthy response is:
 |---|---|---|
 | `TASKCENTRAL_VERSION` | Release bundle version | Pinned backend/frontend container tag |
 | `TASKCENTRAL_IMAGE_PREFIX` | Generated per release | Registry and package owner |
-| `TASKCENTRAL_RELEASE_REPOSITORY` | Generated per release | Repository used to discover updates |
+| `TASKCENTRAL_RELEASE_REPOSITORY` | `lurry2020/taskcentral`; generated per release | Repository used by the in-app version check and updater |
 | `APP_NAME` | `Task Central` | Backend application/logging name; the visible UI name is also stored in Settings |
 | `APP_ENV` | `development` in code, `production` in Compose | Environment label used in startup logging |
 | `APP_PORT` | `8484` | Host port published by the frontend container |
@@ -1684,19 +1702,67 @@ tail -f logs/taskcentral.log logs/frontend.log
 Do not downgrade the database casually. SQLite constraint changes use table-rebuild migrations,
 and older application versions may not understand newer machine types or fields.
 
+## Version and update checking
+
+The bottom of the desktop sidebar and mobile navigation drawer includes a **Version** button above
+**Changelog**. It always identifies the release running in the backend container. Task Central
+checks that release against the latest published GitHub release after the user signs in.
+
+The installed release is pinned by `TASKCENTRAL_VERSION` in the installation's `.env`; release
+bundles keep the accompanying `VERSION` file at the same value. To discover the latest release,
+the backend downloads the small `VERSION` asset published at:
+
+```text
+https://github.com/lurry2020/taskcentral/releases/latest/download/VERSION
+```
+
+Successful results are cached in backend memory for one hour, preventing repeated GitHub requests
+during normal navigation. The check sends no inventory, settings, credentials, or other application
+data to GitHub.
+
+- When the installed release is current, the modal says **You're up to date**.
+- When a newer release exists, the sidebar button displays an **Update** marker and the modal shows
+  both installed and latest versions.
+- If GitHub is unavailable, the modal reports that the check could not be completed without
+  claiming that an update is or is not available. **Check again** retries the request.
+
+The modal links to the Task Central GitHub Releases page and can be closed with its **X**, the
+Escape key, or the backdrop. Checking does not install anything. Run `./update.sh` from the
+installation directory to perform the normal backed-up update process.
+
+The authenticated endpoint is:
+
+```text
+GET /api/v1/version
+```
+
+The release repository comes from `TASKCENTRAL_RELEASE_REPOSITORY`, which official bundles set to
+`lurry2020/taskcentral`.
+
+The frontend image also embeds its own build version. While Task Central is open, the browser
+checks the running backend version every 60 seconds and again when the tab regains focus. If an
+update changes the backend while an older frontend remains loaded, a persistent banner identifies
+both versions and offers **Reload Task Central**. Reloading is user-controlled so an automatic
+refresh cannot discard an in-progress form.
+
+Task Central serves `index.html` and browser routes with `no-store`/`no-cache` headers, so a normal
+reload retrieves the current application shell. Fingerprinted files under `/assets/` remain
+immutable and cacheable because every frontend build gives changed assets new filenames. A hard
+refresh should not be necessary after this behavior is present in the installed release. A reverse
+proxy or CDN should preserve these origin cache headers rather than overriding them.
+
 ## Changelog and What's New
 
 Task Central keeps release notes in the repository-level `CHANGELOG.md`. The backend reads that
-file and returns only the section associated with the running `TASKCENTRAL_VERSION`; older release
-sections are not sent to the modal. Development builds use the `[Unreleased]` section. A tagged
-release can also use the immutable `[Unreleased]` section baked into that release image when an
-exact version heading is not present.
+file and returns the section associated with the running `TASKCENTRAL_VERSION` followed by every
+older release section. Sections remain in newest-first order. Unpublished `[Unreleased]` notes are
+not included when an exact version heading exists.
 
 After an existing installation updates to a version it has not seen:
 
 1. The user signs in and visits the Dashboard at `/`.
 2. Task Central automatically opens the **What's New in Task Central** modal.
-3. The modal renders only the current version's Markdown notes.
+3. The modal renders the current version followed by the complete older release history.
 4. The current version is stored internally as `changelog_seen_version`, preventing another
    automatic popup for that version.
 
@@ -1707,13 +1773,13 @@ installations mark their setup version as seen when the first-run wizard complet
 installation is not misidentified as an update.
 
 The **Changelog** button remains at the bottom of the desktop and mobile sidebar. It reopens the
-same current-version modal at any time and does not display older versions. Close the modal with
-its **X**, the Escape key, or the backdrop.
+same modal at any time. The history has its own bounded scroll area, with the newest version at the
+top and the oldest at the bottom. Close the modal with its **X**, the Escape key, or the backdrop.
 
 Maintainers write release sections in this format:
 
 ```markdown
-## [1.2.3] - 2026-07-30
+## [1.2.3]
 
 ### Added
 
@@ -1769,9 +1835,10 @@ Do not paste real tokens into tickets, notes, prompts, or command history.
 | `/auth` | Login and current-user validation |
 | `/health` | Database-backed health check |
 | `/chat` | Authenticated local-LLM chat completion |
+| `/version` | Installed release and cached latest-GitHub-release comparison |
 | `/changelog` | Current-version notes and the one-time seen acknowledgement |
 | `/dashboard` | Summary, recent machines, and attention items |
-| `/machines` | Inventory CRUD, validation, duplicate, archive, hosts, tags, and activity |
+| `/machines` | Inventory CRUD, validation, live connectivity, duplicate, archive, hosts, tags, and activity |
 | `/machines/{id}/tasks` | Checklist task operations |
 | `/machines/{id}/reminders` | Recurring reminder operations |
 | `/machines/{id}/services` | Service records |

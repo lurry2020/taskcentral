@@ -6,6 +6,7 @@ from app.services.changelog import (
     CHANGELOG_SEEN_KEY,
     has_seen_current_changelog,
     mark_current_changelog_seen,
+    parse_changelog_history,
     parse_changelog_section,
 )
 
@@ -16,13 +17,13 @@ SAMPLE_CHANGELOG = """# Changelog
 
 - Pending feature
 
-## [1.2.0] - 2026-07-30
+## [1.2.0]
 
 ### Added
 
 - Current feature
 
-## [1.1.0] - 2026-07-01
+## [1.1.0]
 
 - Older feature
 """
@@ -33,9 +34,18 @@ def test_parser_returns_only_the_requested_version():
 
     assert entry.version == "1.2.0"
     assert entry.display_version == "1.2.0"
-    assert entry.released_at == "2026-07-30"
     assert "Current feature" in entry.content
     assert "Older feature" not in entry.content
+    assert "Pending feature" not in entry.content
+
+
+def test_history_returns_current_and_older_versions_newest_first():
+    entry = parse_changelog_history(SAMPLE_CHANGELOG, "1.2.0")
+
+    assert "## [Unreleased]" not in entry.content
+    assert "## [1.2.0]" in entry.content
+    assert "## [1.1.0]" in entry.content
+    assert entry.content.index("## [1.2.0]") < entry.content.index("## [1.1.0]")
     assert "Pending feature" not in entry.content
 
 
@@ -80,7 +90,10 @@ def test_changelog_api_marks_current_version_seen(client, db_session):
     assert body["available"] is True
     assert body["seen"] is False
     assert body["content"].strip()
-    assert "## [" not in body["content"]
+    assert f"## [{current}]" in body["content"]
+    assert "## [1.0.0]" in body["content"]
+    assert "## [Unreleased]" not in body["content"]
+    assert body["content"].index(f"## [{current}]") < body["content"].index("## [1.0.0]")
 
     marked = client.post("/api/v1/changelog/current/seen")
     assert marked.status_code == 200

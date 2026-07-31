@@ -1,4 +1,4 @@
-"""Read current-version release notes and persist whether they were shown."""
+"""Read release history and persist whether the current version was shown."""
 
 from __future__ import annotations
 
@@ -24,7 +24,6 @@ SECTION_RE = re.compile(
 class ChangelogSection:
     version: str
     display_version: str
-    released_at: str | None
     content: str
     available: bool
 
@@ -40,6 +39,15 @@ def _target_heading(version: str) -> str:
     return "Unreleased" if normalized_version(version) == "dev" else normalized_version(version)
 
 
+def _parse_sections(text: str) -> list[tuple[str, str]]:
+    matches = list(SECTION_RE.finditer(text))
+    sections: list[tuple[str, str]] = []
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        sections.append((match.group(1).strip(), text[match.end() : end].strip()))
+    return sections
+
+
 def parse_changelog_section(text: str, version: str) -> ChangelogSection:
     """Return only the matching H2 release section.
 
@@ -47,17 +55,7 @@ def parse_changelog_section(text: str, version: str) -> ChangelogSection:
     release image is immutable, that section represents the changes available
     at the time that particular image was built.
     """
-    matches = list(SECTION_RE.finditer(text))
-    sections: dict[str, tuple[str, str | None, str]] = {}
-    for index, match in enumerate(matches):
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        heading = match.group(1).strip()
-        released_at = match.group(2).strip() if match.group(2) else None
-        sections[heading.casefold()] = (
-            heading,
-            released_at,
-            text[match.end() : end].strip(),
-        )
+    sections = {heading.casefold(): (heading, content) for heading, content in _parse_sections(text)}
 
     current = normalized_version(version)
     target = _target_heading(current)
@@ -68,19 +66,63 @@ def parse_changelog_section(text: str, version: str) -> ChangelogSection:
         return ChangelogSection(
             version=current,
             display_version=current,
-            released_at=None,
             content="",
             available=False,
         )
 
-    heading, released_at, content = selected
+    heading, content = selected
     display_version = "Unreleased" if heading.casefold() == "unreleased" and current == "dev" else current
     return ChangelogSection(
         version=current,
         display_version=display_version,
-        released_at=released_at,
         content=content,
         available=bool(content),
+    )
+
+
+def parse_changelog_history(text: str, version: str) -> ChangelogSection:
+    """Return the running release and all older sections in newest-first order."""
+    sections = _parse_sections(text)
+    current = normalized_version(version)
+    target = _target_heading(current)
+    start = next(
+        (index for index, (heading, _) in enumerate(sections) if heading.casefold() == target.casefold()),
+        None,
+    )
+    if start is None and current != "dev":
+        start = next(
+            (
+                index
+                for index, (heading, _) in enumerate(sections)
+                if heading.casefold() == "unreleased"
+            ),
+            None,
+        )
+    if start is None:
+        return ChangelogSection(
+            version=current,
+            display_version=current,
+            content="",
+            available=False,
+        )
+
+    rendered: list[str] = []
+    for index, (heading, content) in enumerate(sections[start:]):
+        if not content:
+            continue
+        display_heading = (
+            current
+            if index == 0 and heading.casefold() == "unreleased" and current != "dev"
+            else heading
+        )
+        rendered.append(f"## [{display_heading}]\n\n{content}")
+
+    history = "\n\n".join(rendered)
+    return ChangelogSection(
+        version=current,
+        display_version="Unreleased" if current == "dev" else current,
+        content=history,
+        available=bool(history),
     )
 
 
@@ -98,8 +140,8 @@ def current_changelog(settings: Settings | None = None) -> ChangelogSection:
     path = _changelog_path(settings)
     if path is None:
         version = normalized_version(settings.taskcentral_version)
-        return ChangelogSection(version, version, None, "", False)
-    return parse_changelog_section(
+        return ChangelogSection(version, version, "", False)
+    return parse_changelog_history(
         path.read_text(encoding="utf-8"),
         settings.taskcentral_version,
     )

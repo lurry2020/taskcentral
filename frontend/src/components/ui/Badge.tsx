@@ -59,11 +59,19 @@ export function TypeBadge({ type }: { type: MachineType }) {
   );
 }
 
-export function TagBadge({ tag }: { tag: string }) {
+export function TagBadge({ tag, className }: { tag: string; className?: string }) {
   return (
-    <span className="inline-flex items-center rounded-md bg-fill px-1.5 py-0.5 text-[11px] text-muted ring-1 ring-inset ring-line">
-      <span className="text-faint">#</span>
-      {tag}
+    <span
+      className={cn(
+        "inline-flex min-w-0 items-center rounded-md bg-fill px-1.5 py-0.5 text-[11px] text-muted ring-1 ring-inset ring-line",
+        className,
+      )}
+      title={tag}
+    >
+      <span className="min-w-0 truncate">
+        <span className="text-faint">#</span>
+        {tag}
+      </span>
     </span>
   );
 }

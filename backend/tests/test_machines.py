@@ -47,6 +47,37 @@ def test_machine_connectivity_without_ip_is_unknown(client):
     assert "No IP address" in response.json()["message"]
 
 
+def test_machine_connectivity_batch_uses_stored_ips(client, machine, monkeypatch):
+    import app.routers.machines as machine_router
+    from app.services.connectivity import PingResult
+
+    no_ip = client.post(
+        "/api/v1/machines",
+        json={"name": "no-ip-batch", "machine_type": "VM"},
+    ).json()
+    monkeypatch.setattr(
+        machine_router,
+        "ping_ip_address",
+        lambda address: PingResult("online", 2.5, f"Reply from {address}."),
+    )
+
+    response = client.get(
+        "/api/v1/machines/connectivity",
+        params=[
+            ("machine_ids", machine["id"]),
+            ("machine_ids", no_ip["id"]),
+        ],
+    )
+
+    assert response.status_code == 200
+    results = {item["machine_id"]: item for item in response.json()}
+    assert results[machine["id"]]["status"] == "online"
+    assert results[machine["id"]]["ip_address"] == "192.168.1.50"
+    assert results[machine["id"]]["latency_ms"] == 2.5
+    assert results[no_ip["id"]]["status"] == "unknown"
+    assert results[no_ip["id"]]["ip_address"] is None
+
+
 def test_create_host_machine_and_document(client):
     resp = client.post(
         "/api/v1/machines",
