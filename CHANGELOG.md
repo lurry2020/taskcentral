@@ -7,6 +7,14 @@ displays the running version and every older release in newest-first order.
 
 ## [Unreleased]
 
+### Changed
+
+- Removed the Active summary card from the Dashboard.
+- Template-derived reminders can now be deleted from an individual machine without deleting the
+  source reminder template or copies belonging to other machines.
+- Centered the Task Central Changelog modal title.
+- Removed the Statuses filter from the Inventory page.
+
 ## [1.1.3]
 
 ### Added

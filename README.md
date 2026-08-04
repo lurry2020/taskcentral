@@ -9,32 +9,32 @@ one-click Obsidian-ready Markdown document for your vault.
 
 - **Machine records** for VMs, LXC containers, and physical machines with identity, network,
   OS, and hardware fields (type-aware: VMID for VM/LXC, inventory fields for physical).
-- **Generated setup checklists** — creating a machine copies the applicable task templates
+- **Generated setup checklists** - creating a machine copies the applicable task templates
   (UniFi, Pi-hole DNS, Uptime Kuma, Homarr, Caddy, backups, validation, …) into independent
   per-machine tasks with statuses: Pending, In Progress, Completed, Blocked (reason required),
   Not Applicable (excluded from progress).
-- **Task Templates** page — manage the default checklist per machine type; "Apply new defaults"
+- **Task Templates** page - manage the default checklist per machine type; "Apply new defaults"
   adds missing template tasks to an existing machine with a preview and no duplicates.
-- **Services & dependencies** — record what runs on each machine (name/port/protocol/URL) and
+- **Services & dependencies** - record what runs on each machine (name/port/protocol/URL) and
   what it depends on (other tracked machines or external systems), with reverse-dependency view.
 - **Markdown notes** with preview, per machine and per task.
-- **Obsidian document generation** — per-type Jinja templates (sandboxed), rendered with live
+- **Obsidian document generation** - per-type Jinja templates (sandboxed), rendered with live
   machine data; copy to clipboard, download as `.md`, versioned snapshots, restore/view history.
-  Task Central never writes to your vault — the workflow is copy/paste or download by design.
-- **Dashboard** — summary cards, recent machines with progress, "needs attention" list.
-- **History** — audit-style activity log per machine.
-- **Data management** — full JSON export/import for every machine type (validated, with a
+  Task Central never writes to your vault - the workflow is copy/paste or download by design.
+- **Dashboard** - summary cards, recent machines with progress, "needs attention" list.
+- **History** - audit-style activity log per machine.
+- **Data management** - full JSON export/import for every machine type (validated, with a
   record-count summary and specific validation errors), SQLite backup
   download, restore default templates, and a confirmed factory reset that deletes all data and
   credentials before returning the application to first-run setup.
-- **Powerful machine list** — search, filters (type/status/host/tag/archived), sorting,
+- **Powerful machine list** - search, filters (type/status/host/tag/archived), sorting,
   pagination, duplicate/archive/delete with confirmations. Soft-delete via archive; hard delete
   only from the archive view.
-- **First-run setup wizard** — creates the login username and password and configures general
+- **First-run setup wizard** - creates the login username and password and configures general
   preferences, Telegram, and optional local AI before the first login.
-- **Machine reachability** — machine detail headers ping the stored IP from the backend and show
+- **Machine reachability** - machine detail headers ping the stored IP from the backend and show
   Online or Offline with manual refresh, hover details, and periodic checks.
-- **Version-aware changelog** — after an update, the Dashboard shows the current release notes
+- **Version-aware changelog** - after an update, the Dashboard shows the current release notes
   once automatically; the sidebar Changelog button reopens them at any time.
 
 ## Technology stack
@@ -43,7 +43,7 @@ one-click Obsidian-ready Markdown document for your vault.
 | ---------- | ------------------------------------------------------------- |
 | Backend    | Python 3.12 · FastAPI · SQLAlchemy 2 · Alembic · Pydantic v2  |
 | Templates  | Jinja2 (SandboxedEnvironment)                                 |
-| Database   | SQLite (default) — PostgreSQL-ready via `DATABASE_URL`        |
+| Database   | SQLite (default) - PostgreSQL-ready via `DATABASE_URL`        |
 | Frontend   | React 18 · TypeScript · Vite · Tailwind CSS v4                |
 | Data/forms | TanStack Query · React Hook Form · Zod                        |
 | Icons      | Lucide                                                        |
@@ -226,7 +226,7 @@ cd backend
 
 1. Add `psycopg[binary]` to `backend/requirements.txt` and rebuild.
 2. Set `DATABASE_URL=postgresql+psycopg://user:pass@host:5432/taskcentral`.
-3. Start the stack — Alembic creates the schema on the empty database.
+3. Start the stack - Alembic creates the schema on the empty database.
 4. Move data by exporting JSON from the SQLite instance (Settings → Export) and importing it
    into the new instance.
 
@@ -240,7 +240,7 @@ cd backend
 
 **Restore**:
 
-- JSON: Settings → **Import from JSON…** — the file is validated first, you see a summary, and
+- JSON: Settings → **Import from JSON…** - the file is validated first, you see a summary, and
   the import **replaces all current data**.
 - SQLite file: stop the stack, replace `./data/taskcentral.db`, start again.
 
@@ -324,7 +324,7 @@ docker compose exec backend python -m app.cli setpassword --reset
 ```
 
 The new password is stored (salted PBKDF2 hash) in the database and takes effect immediately for
-new logins — no restart needed. It overrides `AUTH_PASSWORD` until you `--reset`. The hash is
+new logins - no restart needed. It overrides `AUTH_PASSWORD` until you `--reset`. The hash is
 never included in JSON data exports. Both forms preserve the username selected during setup;
 `--reset` clears only the stored password override.
 
@@ -332,8 +332,8 @@ never included in JSON data exports. Both forms preserve the username selected d
 
 - **Login is enabled** (see above), but the SPA is still a client-side app: keep the instance on
   a private homelab network behind your firewall/VPN or an authenticating reverse proxy, and add
-  HTTPS if you ever expose it. Set a strong random **`SECRET_KEY`** — it signs the session tokens.
-- Obsidian templates render in a **sandboxed** Jinja environment — no arbitrary Python.
+  HTTPS if you ever expose it. Set a strong random **`SECRET_KEY`** - it signs the session tokens.
+- Obsidian templates render in a **sandboxed** Jinja environment - no arbitrary Python.
 - Markdown is sanitized (DOMPurify) before rendering in the UI.
 - Generated filenames are sanitized against path traversal; import size is limited (20 MB).
 
@@ -343,7 +343,7 @@ Each machine type (VM / LXC / Physical) has one template, editable under **Obsid
 Templates**. Generating a document on a machine's **Obsidian** tab renders the template with
 that machine's current data and stores a snapshot (versioned; old versions stay viewable).
 Copy the result to your clipboard or download it as `machine-name.md` and drop it into your
-vault — Task Central intentionally never writes to the vault itself.
+vault - Task Central intentionally never writes to the vault itself.
 
 Template syntax is Jinja:
 
@@ -376,7 +376,7 @@ The full list with descriptions (and copy buttons) is shown next to the template
 
 Task templates define the default checklist. Each has a machine-type scope (All / VM / LXC /
 Physical), category, required flag, enabled flag, and sort order. When a machine is created,
-all **enabled** templates matching its type are **copied** into independent machine tasks —
+all **enabled** templates matching its type are **copied** into independent machine tasks -
 editing or deleting a template later never changes existing machines. To pull new defaults
 into an existing machine, use **Apply new defaults** on its checklist tab: it previews exactly
 which tasks would be added and skips anything already present.
@@ -400,9 +400,9 @@ headers, chat prompts, or model response bodies.
 | -------------------------------- | --------------------------------------------------------------------------------------- |
 | Port 8484 already in use         | Set `APP_PORT` in `.env` and `docker compose up -d`                                      |
 | `502` from the frontend          | Check `logs/frontend.log`, then `logs/taskcentral.log`                                   |
-| Database locked errors           | SQLite dislikes concurrent writers; this app is single-user — check for stray processes  |
+| Database locked errors           | SQLite dislikes concurrent writers; this app is single-user - check for stray processes  |
 | Import rejected                  | The JSON must come from Settings → Export (`"format": "taskcentral-export"`)             |
-| Template error when generating   | The template failed to render — the error message names the line; Reset to default helps |
+| Template error when generating   | The template failed to render - the error message names the line; Reset to default helps |
 | Frontend dev server API errors   | Ensure `uvicorn` runs on :8000, or set `VITE_API_PROXY`                                  |
 
 ## API

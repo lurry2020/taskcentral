@@ -142,7 +142,7 @@ def build_export(db: Session) -> dict:
         "settings": {
             row.key: json.loads(row.value)
             for row in db.scalars(select(ApplicationSetting))
-            # Never export the password hash — keep it out of shareable backups.
+            # Never export the password hash - keep it out of shareable backups.
             if row.key not in ("auth_password_hash", "llm_api_key", "setup_completed")
         },
     }

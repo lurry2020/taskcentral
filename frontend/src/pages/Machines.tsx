@@ -86,7 +86,6 @@ function MachineState({
 export function Machines() {
   const [search, setSearch] = useState("");
   const [machineType, setMachineType] = useState("");
-  const [status, setStatus] = useState("");
   const [host, setHost] = useState("");
   const [tag, setTag] = useState("");
   const [archived, setArchived] = useState(false);
@@ -105,7 +104,6 @@ export function Machines() {
     () => ({
       search: search || undefined,
       machine_type: machineType || undefined,
-      status: status || undefined,
       host: host || undefined,
       tag: tag || undefined,
       archived,
@@ -114,7 +112,7 @@ export function Machines() {
       page,
       page_size: pageSize,
     }),
-    [search, machineType, status, host, tag, archived, sortBy, sortDir, page, pageSize],
+    [search, machineType, host, tag, archived, sortBy, sortDir, page, pageSize],
   );
   const { data, isLoading, isError, error, refetch } = useMachines(params);
   const visibleMachineIds = useMemo(() => data?.items.map((machine) => machine.id) ?? [], [data]);
@@ -133,7 +131,7 @@ export function Machines() {
   const qc = useQueryClient();
   const { toast } = useToast();
 
-  const hasFilters = Boolean(search || machineType || status || host || tag || archived);
+  const hasFilters = Boolean(search || machineType || host || tag || archived);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["machines"] });
@@ -191,7 +189,6 @@ export function Machines() {
   const clearFilters = () => {
     setSearch("");
     setMachineType("");
-    setStatus("");
     setHost("");
     setTag("");
     setArchived(false);
@@ -340,20 +337,6 @@ export function Machines() {
             </div>
             <div className="w-[calc(50%-0.25rem)] sm:w-40">
               <Select
-                value={status}
-                onChange={(e) => setFilter(setStatus)(e.target.value)}
-                aria-label="Filter by status"
-              >
-                <option value="">All statuses</option>
-                {meta?.machine_statuses.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div className="w-[calc(50%-0.25rem)] sm:w-40">
-              <Select
                 value={host}
                 onChange={(e) => setFilter(setHost)(e.target.value)}
                 aria-label="Filter by host"
@@ -483,11 +466,11 @@ export function Machines() {
                           className="max-w-36 truncate px-3 py-3 text-muted"
                           title={m.host ?? undefined}
                         >
-                          {m.host ?? "—"}
+                          {m.host ?? "-"}
                         </td>
                         <td className="max-w-48 px-3 py-3">
                           <p className="truncate font-mono text-xs" title={m.ip_address ?? undefined}>
-                            {m.ip_address ?? "—"}
+                            {m.ip_address ?? "-"}
                           </p>
                           <p
                             className="truncate font-mono text-[11px] text-faint"
@@ -506,7 +489,7 @@ export function Machines() {
                         >
                           {m.operating_system
                             ? `${m.operating_system} ${m.operating_system_version ?? ""}`.trim()
-                            : "—"}
+                            : "-"}
                         </td>
                         <td className="px-3 py-3">
                           <MachineState

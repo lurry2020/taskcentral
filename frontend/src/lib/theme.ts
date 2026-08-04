@@ -20,7 +20,7 @@ export function setStoredTheme(theme: Theme): void {
   try {
     localStorage.setItem(STORAGE_KEY, theme);
   } catch {
-    /* storage unavailable — theme still applies for this session */
+    /* storage unavailable - theme still applies for this session */
   }
   applyTheme(theme);
 }

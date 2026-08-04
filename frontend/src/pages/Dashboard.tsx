@@ -4,7 +4,6 @@ import {
   ArrowRight,
   CheckCircle2,
   ClipboardList,
-  Loader2,
   Server,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -59,17 +58,11 @@ export function Dashboard() {
       {isError && <ErrorState message={(error as Error)?.message} onRetry={() => refetch()} />}
       {data && (
         <div className="space-y-6">
-          <Card className="grid grid-cols-2 divide-x divide-y divide-border/70 overflow-hidden sm:grid-cols-3 xl:grid-cols-5 xl:divide-y-0">
+          <Card className="grid grid-cols-2 divide-x divide-y divide-border/70 overflow-hidden sm:grid-cols-2 xl:grid-cols-4 xl:divide-y-0">
             <SummaryCard
               label="Total machines"
               value={data.summary.total_machines}
               icon={<Server className="h-4.5 w-4.5" aria-hidden />}
-            />
-            <SummaryCard
-              label="Active"
-              value={data.summary.active_deployments}
-              icon={<Loader2 className="h-4.5 w-4.5" aria-hidden />}
-              tone="warn"
             />
             <SummaryCard
               label="Completed"

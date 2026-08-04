@@ -75,7 +75,7 @@ export function StorageTab({ machine }: { machine: Machine }) {
         <EmptyState
           icon={<HardDrive />}
           title="No drives recorded"
-          description="Record every disk in this machine — drive, capacity, and what it's used for."
+          description="Record every disk in this machine - drive, capacity, and what it's used for."
           action={
             <Button size="sm" variant="primary" onClick={() => setDialog({ open: true })}>
               Add the first drive

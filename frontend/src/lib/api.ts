@@ -41,7 +41,7 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-/** A 401 on a request that carried a token means the session expired — sign out. */
+/** A 401 on a request that carried a token means the session expired - sign out. */
 function handleUnauthorized(status: number): void {
   if (status === 401 && getToken()) {
     clearToken();
@@ -84,7 +84,7 @@ export const api = {
   delete: <T = void>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 
-/** Authenticated file download (export / backup) — the token can't ride on an <a href>. */
+/** Authenticated file download (export / backup) - the token can't ride on an <a href>. */
 export async function downloadWithAuth(path: string, fallbackName = "download"): Promise<void> {
   const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
   if (!res.ok) {

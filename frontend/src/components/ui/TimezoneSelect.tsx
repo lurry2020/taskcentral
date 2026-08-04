@@ -6,7 +6,7 @@ import { fieldBase, Input } from "./Field";
 
 /**
  * A searchable dropdown for the (400+) IANA timezone list. Unlike a native
- * <select>, it always opens downward — positioned in a body portal relative to
+ * <select>, it always opens downward - positioned in a body portal relative to
  * the trigger, capped to the viewport with internal scroll.
  */
 export function TimezoneSelect({
@@ -32,7 +32,7 @@ export function TimezoneSelect({
   };
 
   // The fixed menu would drift from its anchor on page scroll/resize, so close it
-  // then — but NOT when scrolling happens inside the menu's own list.
+  // then - but NOT when scrolling happens inside the menu's own list.
   useEffect(() => {
     if (!open) return;
     const onScroll = (e: Event) => {

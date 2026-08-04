@@ -26,7 +26,7 @@ export function setAppTimeZone(tz: string): void {
   try {
     localStorage.setItem(TZ_KEY, tz);
   } catch {
-    /* storage unavailable — still applies for this session */
+    /* storage unavailable - still applies for this session */
   }
 }
 
@@ -43,7 +43,7 @@ function parseServerDate(value: string): Date {
 }
 
 export function formatDate(value: string | null | undefined): string {
-  if (!value) return "—";
+  if (!value) return "-";
   // Pure calendar date (deployment/due date): show as-is, no timezone shift.
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     const [y, m, d] = value.split("-").map(Number);
@@ -64,7 +64,7 @@ export function formatDate(value: string | null | undefined): string {
 }
 
 export function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "—";
+  if (!value) return "-";
   const d = parseServerDate(value);
   if (Number.isNaN(d.getTime())) return value;
   return d.toLocaleString(undefined, {
@@ -79,7 +79,7 @@ export function formatDateTime(value: string | null | undefined): string {
 }
 
 export function relativeTime(value: string | null | undefined): string {
-  if (!value) return "—";
+  if (!value) return "-";
   const then = parseServerDate(value).getTime();
   if (Number.isNaN(then)) return value;
   const seconds = Math.round((Date.now() - then) / 1000);
@@ -96,7 +96,7 @@ export function relativeTime(value: string | null | undefined): string {
 }
 
 export function formatSize(value: number | null, unit: string | null): string {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined) return "-";
   const v = Number.isInteger(value) ? value : Math.round(value * 100) / 100;
   return unit ? `${v} ${unit}` : String(v);
 }
@@ -127,7 +127,7 @@ export const taskStatusStyles: Record<TaskStatus, string> = {
   "Not Applicable": "bg-surface-3 text-faint border-border",
 };
 
-// Dot indicator colors — a small colored dot beside muted text reads far more
+// Dot indicator colors - a small colored dot beside muted text reads far more
 // like an infrastructure console than a colored pill.
 export const statusDot: Record<MachineStatus, string> = {
   Draft: "bg-faint",

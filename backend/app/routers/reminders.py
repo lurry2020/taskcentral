@@ -116,12 +116,13 @@ def mark_reminder_done(machine_id: int, reminder_id: int, db: Session = Depends(
 @router.delete("/machines/{machine_id}/reminders/{reminder_id}", status_code=204)
 def delete_reminder(machine_id: int, reminder_id: int, db: Session = Depends(get_db)):
     reminder = _get_reminder(db, machine_id, reminder_id)
-    if not reminder.is_custom:
-        raise HTTPException(
-            status_code=400,
-            detail="Only custom reminders can be deleted. Disable template reminders instead.",
-        )
-    log_event(db, "reminder_deleted", f'Custom reminder "{reminder.title}" deleted.', machine_id)
+    source = "Custom" if reminder.is_custom else "Template-derived"
+    log_event(
+        db,
+        "reminder_deleted",
+        f'{source} reminder "{reminder.title}" deleted from this machine.',
+        machine_id,
+    )
     db.delete(reminder)
     db.commit()
     return Response(status_code=204)

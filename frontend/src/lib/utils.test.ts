@@ -13,7 +13,7 @@ describe("formatSize", () => {
     expect(formatSize(1.5, "TB")).toBe("1.5 TB");
   });
   it("handles missing values", () => {
-    expect(formatSize(null, "GB")).toBe("—");
+    expect(formatSize(null, "GB")).toBe("-");
     expect(formatSize(512, null)).toBe("512");
   });
 });
@@ -24,6 +24,6 @@ describe("relativeTime", () => {
     expect(relativeTime(new Date(Date.now() - 5 * 60_000).toISOString())).toBe("5m ago");
   });
   it("handles empty input", () => {
-    expect(relativeTime(null)).toBe("—");
+    expect(relativeTime(null)).toBe("-");
   });
 });

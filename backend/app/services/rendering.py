@@ -158,7 +158,7 @@ def build_context(machine: Machine, settings: dict | None = None) -> dict:
         }
         for d in machine.dependents
     ]
-    # Guests (VMs/LXCs) that run on this machine — meaningful when it is a host.
+    # Guests (VMs/LXCs) that run on this machine - meaningful when it is a host.
     hosted_machines = sorted(
         (
             {

@@ -1,4 +1,4 @@
-# Task Central — agent orientation
+# Task Central - agent orientation
 
 Self-hosted **homelab machine provisioning & documentation tracker**. Single user. You inventory
 every VM / LXC / physical machine / hypervisor host / router-network, and for each machine you get
@@ -81,19 +81,19 @@ logs/
 Integer PKs, `TimestampMixin` (created_at/updated_at, `base.py`). Enum-ish columns are guarded by
 named `CHECK` constraints (widened over time via batch migrations).
 
-- **machine.py** — `Machine` (the core entity) + child tables, all `ondelete=CASCADE`:
+- **machine.py** - `Machine` (the core entity) + child tables, all `ondelete=CASCADE`:
   `Tag`/`machine_tags` (m2m), `Service`, `StorageDevice`, `NetworkDevice`, `NetworkSegment`,
   `Dependency` (self-ref: `machine_id` depends on `depends_on_machine_id` or free-text
   `external_name`), `MachineNote`. `Machine.machine_type ∈ {VM,LXC,PHYSICAL,HOST,NETWORK}`,
   `status ∈ {Draft,In Progress,Active,Maintenance,Retired,Archived}`, soft-delete via `archived_at`.
   Network fields (isp/connection_type/download_speed/upload_speed/wan_type/responsibilities) and
   `hypervisor` live on Machine too.
-- **task.py** — `TaskTemplate` (scoped `ALL|VM|LXC|PHYSICAL|HOST|NETWORK`) → `MachineTask`
+- **task.py** - `TaskTemplate` (scoped `ALL|VM|LXC|PHYSICAL|HOST|NETWORK`) → `MachineTask`
   (independent copy per machine; status `Pending|In Progress|Completed|Blocked|Not Applicable`).
-- **reminder.py** — `ReminderTemplate` (scoped, `interval_days`) → `MachineReminder`
+- **reminder.py** - `ReminderTemplate` (scoped, `interval_days`) → `MachineReminder`
   (`last_performed_at`, `next_due_at`, `enabled`, `last_notified_due_at`).
-- **template.py** — `ObsidianTemplate` (one per machine_type, Jinja content).
-- **misc.py** — `GeneratedDocument` (versioned doc snapshots), `ActivityEvent` (audit log),
+- **template.py** - `ObsidianTemplate` (one per machine_type, Jinja content).
+- **misc.py** - `GeneratedDocument` (versioned doc snapshots), `ActivityEvent` (audit log),
   `ApplicationSetting` (**key/value store; values are JSON-encoded strings**). Settings that aren't
   in `SettingsOut` (e.g. `auth_password_hash`, `last_alert_sent_at`) are stored here but not exposed.
 
@@ -101,7 +101,7 @@ named `CHECK` constraints (widened over time via batch migrations).
 - **Machine type drives everything.** Field visibility (`frontend/src/components/machine/MachineFields.tsx`),
   which detail tabs show (`frontend/src/pages/machine/MachineDetail.tsx` → `tabsForType`), and which
   templates apply. `NETWORK` machines are special-cased to get **only** NETWORK-scoped
-  tasks/reminders (not `ALL`) — see `services/checklist.py::applicable_templates` and
+  tasks/reminders (not `ALL`) - see `services/checklist.py::applicable_templates` and
   `services/reminders.py::applicable_reminder_templates`.
 - **Templates → per-machine copies at creation.** `services/checklist.py::generate_checklist` and
   `services/reminders.py::generate_reminders` run in `routers/machines.py::create_machine` (and the
@@ -180,7 +180,7 @@ Machine-scoped resources are nested under `/machines/{id}/…`. Helpers in `rout
   `useInvalidateMachine()`.
 - **Design system** in `components/ui/` (Button, Card, Field, Badge, Progress, Dialog, Toast,
   State, Markdown, CopyButton, TimezoneSelect). **Never use raw `bg-white/[x]` / `black` overlays**
-  — use the theme-aware tokens `surface(-2/-3)`, `fill`, `fill-hover`, `line`, `line-strong`,
+  - use the theme-aware tokens `surface(-2/-3)`, `fill`, `fill-hover`, `line`, `line-strong`,
   `border(-strong)`, `text/muted/faint`, `accent(-hover/-deep/-soft)`, `ok/warn/info(-soft)`.
   Tokens + light/dark values are defined in `index.css` (`@theme` + `:root[data-theme="light"]`);
   theme applied via `data-theme` on `<html>` (`lib/theme.ts`, inline script in `index.html`).
@@ -216,7 +216,7 @@ Machine-scoped resources are nested under `/machines/{id}/…`. Helpers in `rout
 - Frontend: vitest for `lib/utils` and `components/machine/schema` (`npx vitest run`).
 
 ## Gotchas
-- Backend timestamps are stored UTC but serialized **without a `Z`** — the frontend re-adds it
+- Backend timestamps are stored UTC but serialized **without a `Z`** - the frontend re-adds it
   (`parseServerDate`) before converting to the app timezone. Don't "fix" the API to local time.
 - The alert loop assumes a **single uvicorn worker** (compose runs one). Multiple workers would
   double-send.
@@ -229,7 +229,7 @@ Machine-scoped resources are nested under `/machines/{id}/…`. Helpers in `rout
   database; verify the live route through OpenAPI/route inspection without posting to it.
 - JSON exports also omit the internal `setup_completed` flag. A missing flag on a database that
   already has settings, machines, or templates is treated as a completed legacy installation.
-- `ApplicationSetting.value` is **JSON-encoded** — always `json.loads/dumps` when touching it.
+- `ApplicationSetting.value` is **JSON-encoded** - always `json.loads/dumps` when touching it.
 - Release scripts are intentionally relocatable and resolve paths from their own directory. Never
   replace them with hard-coded `/taskcentral` paths.
 - Release `.env` files contain generated secrets and must remain mode `0600`. Release bundles

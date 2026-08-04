@@ -39,7 +39,7 @@ def generate_checklist(db: Session, machine: Machine) -> list[MachineTask]:
 
 
 def missing_template_tasks(db: Session, machine: Machine) -> list[TaskTemplate]:
-    """Templates that would be added by 'Apply new default tasks' — skips duplicates.
+    """Templates that would be added by 'Apply new default tasks' - skips duplicates.
 
     A template is a duplicate if the machine already has a task linked to it or a
     task with the same title (covers tasks whose template link was severed).

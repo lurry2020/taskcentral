@@ -126,7 +126,7 @@ export function ServiceDialog({
             value={draft.protocol}
             onChange={(e) => set("protocol", e.target.value)}
           >
-            <option value="">—</option>
+            <option value="">-</option>
             {["HTTP", "HTTPS", "TCP", "UDP", "SSH", "SMB", "NFS", "Other"].map((p) => (
               <option key={p} value={p}>
                 {p}

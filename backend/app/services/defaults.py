@@ -1,6 +1,6 @@
 """Default seed content: task templates, Obsidian templates, application settings."""
 
-# (title, description, category, scope, required) — sort order comes from list position
+# (title, description, category, scope, required) - sort order comes from list position
 DEFAULT_TASK_TEMPLATES: list[tuple[str, str, str, str, bool]] = [
     ("Create or configure the machine", "Provision the VM/LXC or set up the physical hardware.", "Provisioning", "ALL", True),
     ("Configure hostname", "Set the machine hostname to match its DNS record.", "Operating System", "ALL", True),
@@ -44,7 +44,7 @@ DEFAULT_TASK_TEMPLATES: list[tuple[str, str, str, str, bool]] = [
     ("Verify monitoring and alerts", "Confirm the network/WAN is monitored and alerting works.", "Monitoring", "NETWORK", False),
 ]
 
-# (title, description, category, scope, interval_days) — recurring maintenance
+# (title, description, category, scope, interval_days) - recurring maintenance
 # reminders. NETWORK machines get only NETWORK-scoped ones; every other type gets
 # ALL plus its own type-scoped ones (mirrors the checklist scoping).
 DEFAULT_REMINDER_TEMPLATES: list[tuple[str, str, str, str, int]] = [
@@ -154,7 +154,7 @@ Tags: {{{{ machine.tags | join(", ") }}}}
 {extra_hw}_____________
 ## Services Running
 {{% for service in services %}}
-- {{{{ service.name }}}}{{% if service.port %}} (:{{{{ service.port }}}}){{% endif %}}{{% if service.url %}} — {{{{ service.url }}}}{{% endif %}}{{% if service.description %}} — {{{{ service.description }}}}{{% endif +%}}
+- {{{{ service.name }}}}{{% if service.port %}} (:{{{{ service.port }}}}){{% endif %}}{{% if service.url %}} - {{{{ service.url }}}}{{% endif %}}{{% if service.description %}} - {{{{ service.description }}}}{{% endif +%}}
 {{% else %}}
 -
 {{% endfor %}}
@@ -164,7 +164,7 @@ ___
 ## Dependencies
 This machine depends on:
 {{% for dependency in dependencies %}}
-- {{{{ dependency.name }}}} ({{{{ dependency.dependency_type }}}}){{% if dependency.notes %}} — {{{{ dependency.notes }}}}{{% endif +%}}
+- {{{{ dependency.name }}}} ({{{{ dependency.dependency_type }}}}){{% if dependency.notes %}} - {{{{ dependency.notes }}}}{{% endif +%}}
 {{% else %}}
 -
 {{% endfor %}}
@@ -222,7 +222,7 @@ Tags: {{ machine.tags | join(", ") }}
 
 ## Storage
 {% for disk in storage %}
-- **{{ disk.name }}**{% if disk.capacity %} — {{ disk.capacity }}{% endif %}{% if disk.purpose %} — {{ disk.purpose }}{% endif +%}
+- **{{ disk.name }}**{% if disk.capacity %} - {{ disk.capacity }}{% endif %}{% if disk.purpose %} - {{ disk.purpose }}{% endif +%}
 {% else %}
 -
 {% endfor %}
@@ -230,14 +230,14 @@ _____________
 ## Dependencies
 Hosted machines (VMs & LXCs):
 {% for guest in hosted_machines %}
-- {{ guest.name }} ({{ guest.machine_type }}){% if guest.ip_address %} — {{ guest.ip_address }}{% endif +%}
+- {{ guest.name }} ({{ guest.machine_type }}){% if guest.ip_address %} - {{ guest.ip_address }}{% endif +%}
 {% else %}
 -
 {% endfor %}
 
 Other dependencies:
 {% for dependency in dependencies %}
-- {{ dependency.name }} ({{ dependency.dependency_type }}){% if dependency.notes %} — {{ dependency.notes }}{% endif +%}
+- {{ dependency.name }} ({{ dependency.dependency_type }}){% if dependency.notes %} - {{ dependency.notes }}{% endif +%}
 {% else %}
 -
 {% endfor %}

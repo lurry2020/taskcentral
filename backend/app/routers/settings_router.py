@@ -63,7 +63,7 @@ def test_telegram(payload: TelegramTestRequest, db: Session = Depends(get_db)):
     ok, message = send_telegram_message(
         token,
         chat_id,
-        "✅ Test alert from Task Central — your Telegram integration is working.",
+        "✅ Test alert from Task Central - your Telegram integration is working.",
     )
     return TelegramTestResult(ok=ok, message=message)
 

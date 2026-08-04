@@ -1,4 +1,4 @@
-# Task Central — Implementation Notes
+# Task Central - Implementation Notes
 
 Homelab machine provisioning & documentation tracker. Single-user, self-hosted.
 

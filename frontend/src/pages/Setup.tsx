@@ -433,7 +433,7 @@ export function SetupPage({ onComplete }: { onComplete: () => void }) {
                     role="status"
                   >
                     {telegramResult.ok
-                      ? "Test message sent — check Telegram."
+                      ? "Test message sent - check Telegram."
                       : telegramResult.message}
                   </p>
                 )}
@@ -575,7 +575,7 @@ export function SetupPage({ onComplete }: { onComplete: () => void }) {
                   label="Telegram"
                   value={
                     draft.telegramSkipped
-                      ? "Skipped — configure later in Settings"
+                      ? "Skipped - configure later in Settings"
                       : `Configured for chat ${draft.telegramChatId}`
                   }
                 />
@@ -583,7 +583,7 @@ export function SetupPage({ onComplete }: { onComplete: () => void }) {
                   label="Local AI"
                   value={
                     draft.llmSkipped
-                      ? "Skipped — configure later in Settings"
+                      ? "Skipped - configure later in Settings"
                       : `${providerLabel(draft.llmProvider)} · ${draft.llmModel} · ${draft.llmTimeoutSeconds}s`
                   }
                   detail={draft.llmSkipped ? undefined : draft.llmBaseUrl}

@@ -89,7 +89,7 @@ export function ChecklistTab({ machine }: { machine: Machine }) {
       toast(
         result.added.length > 0
           ? `${result.added.length} new task(s) added from templates.`
-          : "No new tasks to add — checklist already up to date.",
+          : "No new tasks to add - checklist already up to date.",
       );
       setApplyPreview(null);
     },

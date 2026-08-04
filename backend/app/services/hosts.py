@@ -2,7 +2,7 @@
 
 When a VM or LXC selects a Host machine (by name) in its ``host`` field, we keep a
 dependency row (guest depends on host, type "Host") in sync so the host's page and
-Obsidian document list every machine it runs — without any manual step.
+Obsidian document list every machine it runs - without any manual step.
 """
 
 from sqlalchemy import func, select

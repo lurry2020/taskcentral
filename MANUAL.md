@@ -864,8 +864,9 @@ explicitly supplied.
 ### Enabling, disabling, and deleting reminders
 
 - Disabled reminders remain visible but are excluded from due-reminder alert checks.
-- Template-derived reminders can be disabled but not deleted.
-- Custom reminders can be edited or deleted.
+- Template-derived and custom reminders can be edited, disabled, or deleted from an individual
+  machine. Deleting a template-derived reminder removes only that machine's copy; it does not
+  delete the source template or reminders already copied to other machines.
 - Only non-archived machines participate in due-reminder checks.
 
 ### Reminder templates
@@ -1916,7 +1917,7 @@ For the separate test installation:
 /testtaskcentral/logs/frontend.log
 ```
 
-For a release-bundle installation, `logs/` is inside the extracted installation directory—the
+For a release-bundle installation, `logs/` is inside the extracted installation directory-the
 same directory that contains `compose.yml`, `.env`, `install.sh`, and `update.sh`. For example, if
 the release was extracted to `/opt/taskcentral`, the files are
 `/opt/taskcentral/logs/taskcentral.log` and `/opt/taskcentral/logs/frontend.log`.

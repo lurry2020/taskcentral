@@ -51,7 +51,7 @@ export function IdentityFields({ form }: { form: Form }) {
             hint="Choose one of your Host machines"
           >
             <Select id="m-host" {...form.register("host")}>
-              <option value="">— Select a host —</option>
+              <option value="">- Select a host -</option>
               {hostOptions.map((n) => (
                 <option key={n} value={n}>
                   {n}
@@ -69,7 +69,7 @@ export function IdentityFields({ form }: { form: Form }) {
           </FormField>
         )
       ) : isHost ? (
-        <FormField label="Cluster / group" htmlFor="m-host" hint="Optional — e.g. a Proxmox cluster name">
+        <FormField label="Cluster / group" htmlFor="m-host" hint="Optional - e.g. a Proxmox cluster name">
           <Input id="m-host" placeholder="pve-cluster" {...form.register("host")} />
         </FormField>
       ) : (
@@ -150,7 +150,7 @@ export function IdentityFields({ form }: { form: Form }) {
             label="Router responsibilities"
             htmlFor="m-resp"
             className="sm:col-span-2"
-            hint="One per line — e.g. Routing, DHCP, DNS Forwarding, Firewall, VPN"
+            hint="One per line - e.g. Routing, DHCP, DNS Forwarding, Firewall, VPN"
           >
             <Textarea
               id="m-resp"
@@ -187,7 +187,7 @@ export function IdentityFields({ form }: { form: Form }) {
       )}
       <FormField label="Architecture" htmlFor="m-arch">
         <Select id="m-arch" {...form.register("architecture")}>
-          <option value="">—</option>
+          <option value="">-</option>
           {["x86_64", "arm64", "armhf", "riscv64", "Other"].map((a) => (
             <option key={a} value={a}>
               {a}

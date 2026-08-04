@@ -9,7 +9,7 @@ import {
 } from "@/lib/utils";
 import type { MachineStatus, MachineType, TaskStatus } from "@/lib/types";
 
-/** Generic label chip — soft, low-contrast, gently rounded (not a loud pill). */
+/** Generic label chip - soft, low-contrast, gently rounded (not a loud pill). */
 export function Badge({
   children,
   className,
@@ -29,7 +29,7 @@ export function Badge({
   );
 }
 
-/** A colored dot beside muted text — the primary status treatment. */
+/** A colored dot beside muted text - the primary status treatment. */
 function DotStatus({ dot, text, label }: { dot: string; text: string; label: string }) {
   return (
     <span className={cn("inline-flex items-center gap-1.5 text-xs font-medium", text)}>

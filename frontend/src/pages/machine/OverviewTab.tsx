@@ -21,7 +21,7 @@ function Row({
       <div className="py-1.5 text-sm">
         <dt className="mb-0.5 text-muted">{label}</dt>
         <dd className="whitespace-pre-wrap break-words leading-relaxed text-text">
-          {value ?? "—"}
+          {value ?? "-"}
         </dd>
       </div>
     );
@@ -30,7 +30,7 @@ function Row({
     <div className="flex justify-between gap-4 py-1.5 text-sm">
       <dt className="shrink-0 text-muted">{label}</dt>
       <dd className={`min-w-0 truncate text-right ${mono ? "font-mono text-xs leading-5" : ""}`}>
-        {value ?? "—"}
+        {value ?? "-"}
       </dd>
     </div>
   );

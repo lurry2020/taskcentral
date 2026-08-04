@@ -18,19 +18,12 @@ export function ChangelogDialog({
   error: Error | null;
   onRetry: () => void;
 }) {
-  const versionLabel =
-    changelog?.display_version === "Unreleased"
-      ? "Development build"
-      : changelog?.display_version
-        ? `Version ${changelog.display_version}`
-        : undefined;
-
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title="Task Central Changelog"
-      description={versionLabel ? `${versionLabel} · Newest releases first` : "Newest releases first"}
+      title={<span className="text-base">Task Central Changelog</span>}
+      centerTitle
       wide
     >
       {isLoading ? (

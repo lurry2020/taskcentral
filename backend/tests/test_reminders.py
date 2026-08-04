@@ -46,7 +46,7 @@ def test_edit_last_performed_recomputes_due(client, machine):
     assert resp.json()["next_due_at"] == (last + timedelta(days=30)).isoformat()
 
 
-def test_custom_reminder_add_delete_rules(client, machine):
+def test_reminder_deletion_is_scoped_to_one_machine(client, machine):
     resp = client.post(
         f"/api/v1/machines/{machine['id']}/reminders",
         json={"title": "Renew TLS cert", "interval_days": 60},
@@ -57,11 +57,43 @@ def test_custom_reminder_add_delete_rules(client, machine):
     assert client.delete(
         f"/api/v1/machines/{machine['id']}/reminders/{custom['id']}"
     ).status_code == 204
-    # Template reminders cannot be deleted
-    tmpl = client.get(f"/api/v1/machines/{machine['id']}/reminders").json()[0]
+
+    other = client.post(
+        "/api/v1/machines", json={"name": "other-vm", "machine_type": "VM"}
+    ).json()
+    tmpl = next(
+        reminder
+        for reminder in client.get(f"/api/v1/machines/{machine['id']}/reminders").json()
+        if not reminder["is_custom"]
+    )
+    matching_other = next(
+        reminder
+        for reminder in client.get(f"/api/v1/machines/{other['id']}/reminders").json()
+        if reminder["template_id"] == tmpl["template_id"]
+    )
+
+    # The nested route cannot delete this reminder through a different machine.
+    assert client.delete(
+        f"/api/v1/machines/{other['id']}/reminders/{tmpl['id']}"
+    ).status_code == 404
+
     assert client.delete(
         f"/api/v1/machines/{machine['id']}/reminders/{tmpl['id']}"
-    ).status_code == 400
+    ).status_code == 204
+    remaining_ids = {
+        reminder["id"]
+        for reminder in client.get(f"/api/v1/machines/{machine['id']}/reminders").json()
+    }
+    assert tmpl["id"] not in remaining_ids
+
+    # Deleting the per-machine copy leaves the source template and other machines untouched.
+    other_ids = {
+        reminder["id"]
+        for reminder in client.get(f"/api/v1/machines/{other['id']}/reminders").json()
+    }
+    assert matching_other["id"] in other_ids
+    template_ids = {template["id"] for template in client.get("/api/v1/reminder-templates").json()}
+    assert tmpl["template_id"] in template_ids
 
 
 def test_reminder_templates_crud(client):
@@ -171,7 +203,7 @@ def test_reminder_send_time_gate(db_session, monkeypatch):
     sent = []
     monkeypatch.setattr(alerts, "SessionLocal", db_session)
     monkeypatch.setattr(alerts, "send_telegram_message", lambda t, c, x: sent.append(x) or (True, "ok"))
-    # Force "now" to 08:00 UTC — before the 23:59 send time → nothing sent.
+    # Force "now" to 08:00 UTC - before the 23:59 send time → nothing sent.
     from datetime import datetime as real_datetime, timezone as tz
 
     class FrozenDatetime(real_datetime):

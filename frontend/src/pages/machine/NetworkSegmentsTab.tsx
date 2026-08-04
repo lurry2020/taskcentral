@@ -85,9 +85,9 @@ export function NetworkSegmentsTab({ machine }: { machine: Machine }) {
                 {segments?.map((s) => (
                   <tr key={s.id} className="transition-colors hover:bg-fill-hover">
                     <td className="px-4 py-2.5 font-medium">{s.name}</td>
-                    <td className="px-3 py-2.5 font-mono text-xs text-muted">{s.vlan_id ?? "—"}</td>
-                    <td className="px-3 py-2.5 font-mono text-xs text-muted">{s.subnet ?? "—"}</td>
-                    <td className="px-3 py-2.5 text-muted">{s.purpose ?? "—"}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-muted">{s.vlan_id ?? "-"}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-muted">{s.subnet ?? "-"}</td>
+                    <td className="px-3 py-2.5 text-muted">{s.purpose ?? "-"}</td>
                     <td className="px-2 py-2.5">
                       <div className="flex items-center justify-end gap-0.5">
                         <Button

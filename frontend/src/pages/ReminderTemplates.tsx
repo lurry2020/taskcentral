@@ -100,7 +100,7 @@ export function ReminderTemplates() {
       <div className="space-y-4">
         <p className="max-w-2xl text-sm text-muted">
           These templates define the recurring reminders copied onto every new machine. Changing
-          them never modifies existing machines — use <em>Apply new defaults</em> on a machine's
+          them never modifies existing machines - use <em>Apply new defaults</em> on a machine's
           Reminders tab to pull in additions.
         </p>
         <div className="flex flex-wrap items-center gap-2">
@@ -145,7 +145,7 @@ export function ReminderTemplates() {
                     checked={t.enabled}
                     onChange={() => toggleMutation.mutate(t)}
                     aria-label={`${t.enabled ? "Disable" : "Enable"} "${t.title}"`}
-                    title={t.enabled ? "Enabled — click to disable" : "Disabled — click to enable"}
+                    title={t.enabled ? "Enabled - click to disable" : "Disabled - click to enable"}
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{t.title}</p>

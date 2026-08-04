@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Bot,
   Database,
   Download,
   FileCode2,
@@ -95,21 +94,6 @@ export function SettingsPage() {
     return zones;
   }, [draft?.timezone]);
 
-  const currentTimeInZone = useMemo(() => {
-    if (!draft?.timezone) return null;
-    try {
-      return new Intl.DateTimeFormat(undefined, {
-        timeZone: draft.timezone,
-        weekday: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZoneName: "short",
-      }).format(new Date());
-    } catch {
-      return null;
-    }
-  }, [draft?.timezone]);
-
   const saveMutation = useMutation({
     mutationFn: () => api.put<AppSettings>("/settings", draft),
     onSuccess: (saved) => {
@@ -127,7 +111,7 @@ export function SettingsPage() {
         telegram_chat_id: draft?.telegram_chat_id ?? "",
       }),
     onSuccess: (r) =>
-      r.ok ? toast("Test message sent — check Telegram.") : toast(r.message, "error"),
+      r.ok ? toast("Test message sent - check Telegram.") : toast(r.message, "error"),
     onError: (err) => toast((err as Error).message, "error"),
   });
 
@@ -217,15 +201,7 @@ export function SettingsPage() {
         <Card>
           <CardHeader title="General" description="Application-wide preferences" />
           <CardBody className="grid gap-4 sm:grid-cols-2">
-            <FormField
-              label="Timezone"
-              htmlFor="s-tz"
-              hint={
-                currentTimeInZone
-                  ? `Used for every timestamp in the app and generated documents · now ${currentTimeInZone}`
-                  : "Used for every timestamp in the app and generated documents"
-              }
-            >
+            <FormField label="Timezone" htmlFor="s-tz">
               <TimezoneSelect
                 id="s-tz"
                 value={draft.timezone}
@@ -233,7 +209,7 @@ export function SettingsPage() {
                 zones={timezones}
               />
             </FormField>
-            <FormField label="Date format" htmlFor="s-date" hint="Display hint for generated documents">
+            <FormField label="Date format" htmlFor="s-date">
               <Select
                 id="s-date"
                 value={draft.date_format}
@@ -311,9 +287,6 @@ export function SettingsPage() {
                 ))}
               </div>
             </FormField>
-            <p className="mt-2 text-xs text-faint">
-              Applied instantly and saved on this device.
-            </p>
           </CardBody>
         </Card>
 
@@ -331,11 +304,7 @@ export function SettingsPage() {
             }
           />
           <CardBody className="space-y-4">
-            <FormField
-              label="Filename format"
-              htmlFor="s-fn"
-              hint="{name} is the machine name; {date} inserts today's date"
-            >
+            <FormField label="Filename format" htmlFor="s-fn">
               <Input
                 id="s-fn"
                 value={draft.obsidian_filename_format}
@@ -435,11 +404,7 @@ export function SettingsPage() {
               />
               Send due machine reminders to Telegram
             </label>
-            <FormField
-              label="Send reminders at"
-              htmlFor="s-reminder-time"
-              hint={`Daily send time in your timezone (${draft.timezone}). Due reminders go out at or after this time.`}
-            >
+            <FormField label="Send reminders at" htmlFor="s-reminder-time">
               <Input
                 id="s-reminder-time"
                 type="time"
@@ -525,9 +490,6 @@ export function SettingsPage() {
                 >
                   <Send className="h-3.5 w-3.5" aria-hidden /> Send test message
                 </Button>
-                <span className="text-xs text-faint">
-                  Uses the values above — no need to save first.
-                </span>
               </div>
             </div>
           </CardBody>
@@ -588,9 +550,9 @@ export function SettingsPage() {
                 label="Base URL"
                 htmlFor="s-llm-url"
                 hint={
-                  draft.llm_provider === "ollama"
-                    ? "Ollama root URL; /api/chat is added automatically"
-                    : "Include /v1 when your server uses the OpenAI v1 API"
+                  draft.llm_provider === "openai_compatible"
+                    ? "Include /v1 when your server uses the OpenAI v1 API"
+                    : undefined
                 }
                 className="sm:col-span-2"
               >
@@ -688,10 +650,6 @@ export function SettingsPage() {
               >
                 <PlugZap className="h-3.5 w-3.5" aria-hidden /> Test connection
               </Button>
-              <span className="flex items-center gap-1.5 text-xs text-faint">
-                <Bot className="h-3.5 w-3.5" aria-hidden />
-                Uses the values above — no need to save first.
-              </span>
             </div>
           </CardBody>
         </Card>

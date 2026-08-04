@@ -62,7 +62,7 @@ export function RemindersTab({ machine }: { machine: Machine }) {
       api.post(`/machines/${machineId}/reminders/${r.id}/mark-done`),
     onSuccess: (_, r) => {
       invalidate(machineId);
-      toast(`"${r.title}" marked done — next reminder rescheduled.`);
+      toast(`"${r.title}" marked done - next reminder rescheduled.`);
     },
     onError: (err) => toast((err as Error).message, "error"),
   });
@@ -78,7 +78,7 @@ export function RemindersTab({ machine }: { machine: Machine }) {
     mutationFn: (r: MachineReminder) => api.delete(`/machines/${machineId}/reminders/${r.id}`),
     onSuccess: () => {
       invalidate(machineId);
-      toast("Custom reminder deleted.");
+      toast("Reminder deleted from this machine.");
       setDeleting(null);
     },
     onError: (err) => toast((err as Error).message, "error"),
@@ -107,7 +107,7 @@ export function RemindersTab({ machine }: { machine: Machine }) {
       <div className="flex flex-wrap items-center gap-2">
         <p className="min-w-0 flex-1 text-xs text-muted">
           Recurring maintenance reminders. Set when each was last done and Task Central tracks the
-          next due date — due reminders are sent to Telegram when enabled in{" "}
+          next due date - due reminders are sent to Telegram when enabled in{" "}
           <Link to="/settings" className="text-info hover:underline">
             Settings → Alerts
           </Link>
@@ -174,7 +174,7 @@ export function RemindersTab({ machine }: { machine: Machine }) {
                       </span>
                       <span className="flex items-center gap-1">
                         <CalendarClock className="h-3 w-3 text-faint" aria-hidden /> next:{" "}
-                        {r.next_due_at ? formatDate(r.next_due_at) : "—"}
+                        {r.next_due_at ? formatDate(r.next_due_at) : "-"}
                       </span>
                     </div>
                   </div>
@@ -195,7 +195,7 @@ export function RemindersTab({ machine }: { machine: Machine }) {
                       variant="outline"
                       onClick={() => markDone.mutate(r)}
                       disabled={!r.enabled}
-                      title="Mark done — reschedules the next reminder"
+                      title="Mark done - reschedules the next reminder"
                     >
                       <Check className="h-3.5 w-3.5" aria-hidden /> Done
                     </Button>
@@ -218,16 +218,14 @@ export function RemindersTab({ machine }: { machine: Machine }) {
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
-                    {r.is_custom && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Delete ${r.title}`}
-                        onClick={() => setDeleting(r)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-accent-hover" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Delete ${r.title}`}
+                      onClick={() => setDeleting(r)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-accent-hover" />
+                    </Button>
                   </div>
                 </li>
               );
@@ -252,11 +250,11 @@ export function RemindersTab({ machine }: { machine: Machine }) {
         open={deleting !== null}
         onClose={() => setDeleting(null)}
         onConfirm={() => deleting && deleteMutation.mutate(deleting)}
-        title="Delete custom reminder?"
+        title="Delete reminder?"
         message={
           <>
             <strong className="text-text">{deleting?.title}</strong> will be removed from this
-            machine.
+            machine only. Its template and reminders on other machines will not be changed.
           </>
         }
         confirmLabel="Delete"
