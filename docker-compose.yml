@@ -6,7 +6,7 @@ services:
     environment:
       APP_NAME: ${APP_NAME:-Task Central}
       APP_ENV: ${APP_ENV:-production}
-      TASKCENTRAL_VERSION: ${TASKCENTRAL_VERSION:-1.1.3}
+      TASKCENTRAL_VERSION: ${TASKCENTRAL_VERSION:-1.1.4}
       TASKCENTRAL_RELEASE_REPOSITORY: ${TASKCENTRAL_RELEASE_REPOSITORY:-lurry2020/taskcentral}
       CHANGELOG_PATH: /app/CHANGELOG.md
       DATABASE_URL: ${DATABASE_URL:-sqlite:////data/taskcentral.db}
@@ -45,7 +45,7 @@ services:
     build:
       context: ./frontend
       args:
-        TASKCENTRAL_VERSION: ${TASKCENTRAL_VERSION:-1.1.3}
+        TASKCENTRAL_VERSION: ${TASKCENTRAL_VERSION:-1.1.4}
     container_name: ${COMPOSE_PROJECT_NAME:-taskcentral}-frontend
     restart: unless-stopped
     depends_on:

@@ -7,6 +7,8 @@ displays the running version and every older release in newest-first order.
 
 ## [Unreleased]
 
+## [1.1.4]
+
 ### Changed
 
 - Removed the Active summary card from the Dashboard.

@@ -27,7 +27,7 @@ one-click Obsidian-ready Markdown document for your vault.
   record-count summary and specific validation errors), SQLite backup
   download, restore default templates, and a confirmed factory reset that deletes all data and
   credentials before returning the application to first-run setup.
-- **Powerful machine list** - search, filters (type/status/host/tag/archived), sorting,
+- **Powerful machine list** - search, filters (type/host/tag/archived), sorting,
   pagination, duplicate/archive/delete with confirmations. Soft-delete via archive; hard delete
   only from the archive view.
 - **First-run setup wizard** - creates the login username and password and configures general
@@ -199,7 +199,7 @@ cd frontend && npm run build                       # production build
 | `APP_NAME`     | `Task Central`                   | Display name (also editable in Settings)        |
 | `APP_ENV`      | `production`                     | Environment label                               |
 | `APP_PORT`     | `8484`                           | Host port for the web UI                        |
-| `TASKCENTRAL_VERSION` | `1.1.3`                    | Installed application release                   |
+| `TASKCENTRAL_VERSION` | `1.1.4`                    | Installed application release                   |
 | `TASKCENTRAL_RELEASE_REPOSITORY` | `lurry2020/taskcentral` | Repository used to check for releases   |
 | `DATABASE_URL` | `sqlite:////data/taskcentral.db` | SQLAlchemy connection string                    |
 | `CORS_ORIGINS` | `http://localhost:8484`          | Comma-separated allowed origins                 |
@@ -275,8 +275,8 @@ To publish:
 
 ```bash
 # Example: publish the version recorded in VERSION.
-git tag v1.1.3
-git push origin v1.1.3
+git tag v1.1.4
+git push origin v1.1.4
 ```
 
 The tag must match the root `VERSION` file. The release workflow tests the backend and frontend,
