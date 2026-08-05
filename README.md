@@ -132,11 +132,13 @@ scripts, documentation, and container images update together. It creates a datab
 downtime and verifies both health checks. A failed update automatically restores the previous
 release files, version, and database.
 
-Installations created before the self-refreshing updater can use this one-command bridge from their
-existing installation directory:
+## Updating
 
 ```bash
-curl -fsSL https://github.com/lurry2020/taskcentral/releases/latest/download/taskcentral-update.sh | bash
+cd taskcentral/taskcentral-{version}
+#example: cd taskcentral/taskcentral-1.1.2
+
+./update.sh
 ```
 
 After a successful update, the Dashboard presents the current version's changelog once.
@@ -250,49 +252,6 @@ cd backend
   settings, and login credentials, restores factory defaults, signs out, and opens `/setup`.
   This cannot be undone; download a database backup first.
 
-## Upgrading a source installation
-
-```bash
-cd /taskcentral
-git pull            # or copy the new release over
-docker compose build
-docker compose up -d
-```
-
-Migrations run automatically at backend start. Take a backup first.
-
-## Publishing a release
-
-The repository includes CI and release workflows for GitHub Actions. Before the first public
-release:
-
-1. Add the software license you intend to use as `LICENSE`.
-2. Push the repository to GitHub with Actions enabled.
-3. Confirm the workflow can write GitHub Packages and repository releases.
-4. After the first publish, make the two GHCR packages public so users can pull anonymously.
-
-To publish:
-
-```bash
-# Example: publish the version recorded in VERSION.
-git tag v1.1.4
-git push origin v1.1.4
-```
-
-The tag must match the root `VERSION` file. The release workflow tests the backend and frontend,
-builds `amd64` and `arm64` images, publishes them to GHCR with pinned and `latest` tags, creates
-build-provenance attestations, substitutes the repository/image coordinates into the installation
-bundle, publishes checksums, and creates the GitHub Release.
-
-## Reverse proxy (Caddy)
-
-Task Central works behind any reverse proxy. Caddy example (the domain is only an example):
-
-```caddyfile
-taskcentral.example.com {
-    reverse_proxy localhost:8484
-}
-```
 
 ## Authentication
 
