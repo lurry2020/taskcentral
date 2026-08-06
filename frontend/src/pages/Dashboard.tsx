@@ -152,7 +152,7 @@ export function Dashboard() {
             <Card className="xl:col-span-2">
               <CardHeader
                 title="Needs attention"
-                description="Machines with incomplete or blocked work"
+                description="Machines with incomplete work or outdated documents"
               />
               <CardBody className="p-0">
                 {data.needs_attention.length === 0 ? (

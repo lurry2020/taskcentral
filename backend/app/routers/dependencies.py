@@ -7,6 +7,7 @@ from app.models import Dependency, Machine
 from app.routers.helpers import get_machine_or_404
 from app.schemas.machine import DependencyCreate, DependencyOut, ReverseDependencyOut
 from app.services.activity import log_event
+from app.services.documentation import mark_obsidian_document_outdated
 
 router = APIRouter(prefix="/machines/{machine_id}/dependencies", tags=["dependencies"])
 
@@ -56,7 +57,7 @@ def reverse_dependencies(machine_id: int, db: Session = Depends(get_db)):
 
 @router.post("", response_model=DependencyOut, status_code=201)
 def create_dependency(machine_id: int, payload: DependencyCreate, db: Session = Depends(get_db)):
-    get_machine_or_404(db, machine_id)
+    machine = get_machine_or_404(db, machine_id)
     _validate_target(db, machine_id, payload)
     existing = db.scalar(
         select(Dependency).where(
@@ -69,6 +70,7 @@ def create_dependency(machine_id: int, payload: DependencyCreate, db: Session = 
         raise HTTPException(status_code=409, detail="This dependency already exists")
     dep = Dependency(machine_id=machine_id, **payload.model_dump())
     db.add(dep)
+    mark_obsidian_document_outdated(machine)
     db.flush()
     name = dep.depends_on_machine.name if dep.depends_on_machine else dep.external_name
     log_event(db, "dependency_added", f'Dependency on "{name}" added.', machine_id)
@@ -84,9 +86,11 @@ def update_dependency(
     dep = db.get(Dependency, dependency_id)
     if dep is None or dep.machine_id != machine_id:
         raise HTTPException(status_code=404, detail="Dependency not found")
+    machine = get_machine_or_404(db, machine_id)
     _validate_target(db, machine_id, payload)
     for key, value in payload.model_dump().items():
         setattr(dep, key, value)
+    mark_obsidian_document_outdated(machine)
     db.commit()
     db.refresh(dep)
     return _out(dep)
@@ -97,8 +101,10 @@ def delete_dependency(machine_id: int, dependency_id: int, db: Session = Depends
     dep = db.get(Dependency, dependency_id)
     if dep is None or dep.machine_id != machine_id:
         raise HTTPException(status_code=404, detail="Dependency not found")
+    machine = get_machine_or_404(db, machine_id)
     name = dep.depends_on_machine.name if dep.depends_on_machine else dep.external_name
     log_event(db, "dependency_removed", f'Dependency on "{name}" removed.', machine_id)
     db.delete(dep)
+    mark_obsidian_document_outdated(machine)
     db.commit()
     return Response(status_code=204)

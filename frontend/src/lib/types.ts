@@ -59,6 +59,7 @@ export interface MachineBase {
 export interface Machine extends MachineBase {
   id: number;
   archived_at: string | null;
+  obsidian_document_needs_regeneration: boolean;
   created_at: string;
   updated_at: string;
   progress: ChecklistProgress;

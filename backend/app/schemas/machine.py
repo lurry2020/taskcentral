@@ -275,6 +275,7 @@ class MachineListItem(ORMModel):
 class MachineOut(MachineBase, ORMModel):
     id: int
     archived_at: datetime | None
+    obsidian_document_needs_regeneration: bool
     created_at: datetime
     updated_at: datetime
     progress: ChecklistProgress = ChecklistProgress()

@@ -86,6 +86,8 @@ named `CHECK` constraints (widened over time via batch migrations).
   `Dependency` (self-ref: `machine_id` depends on `depends_on_machine_id` or free-text
   `external_name`), `MachineNote`. `Machine.machine_type ∈ {VM,LXC,PHYSICAL,HOST,NETWORK}`,
   `status ∈ {Draft,In Progress,Active,Maintenance,Retired,Archived}`, soft-delete via `archived_at`.
+  `obsidian_document_needs_regeneration` is set by Overview/Service/Dependency/Note mutations and
+  cleared only after a document is generated successfully.
   Network fields (isp/connection_type/download_speed/upload_speed/wan_type/responsibilities) and
   `hypervisor` live on Machine too.
 - **task.py** - `TaskTemplate` (scoped `ALL|VM|LXC|PHYSICAL|HOST|NETWORK`) → `MachineTask`
@@ -125,7 +127,9 @@ named `CHECK` constraints (widened over time via batch migrations).
   `build_context` (machine fields + services/storage/network_devices/network_segments/
   dependencies/reverse_dependencies/hosted_machines/checklist). Output is snapshotted as a
   `GeneratedDocument`. `SAMPLE_CONTEXT` powers template previews. Default templates + the variable
-  list are in `services/defaults.py`.
+  list are in `services/defaults.py`. `services/documentation.py` tracks whether relevant machine
+  changes have made that generated document outdated; the flag feeds both the machine header and
+  Dashboard Needs Attention.
 - **Alerts / Telegram.** `services/telegram.py` sends via the Bot API using **stdlib urllib**,
   **plain text, no parse_mode** (injection-safe). `services/alerts.py` runs an asyncio
   `alert_loop` (started in `main.py` lifespan, single worker) that every ~60s calls
@@ -194,8 +198,8 @@ Machine-scoped resources are nested under `/machines/{id}/…`. Helpers in `rout
   redirects). Sidebar/nav in `components/layout/Layout.tsx`.
 
 ## Migrations & extending
-- Migrations in `backend/app/alembic/versions/` (head chain: initial → HOST → hypervisor+storage →
-  NETWORK → reminders). **SQLite `CHECK`-constraint changes use `op.batch_alter_table`**
+- Migrations in `backend/alembic/versions/` (head chain: initial → HOST → hypervisor+storage →
+  NETWORK → reminders → document regeneration state). **SQLite `CHECK`-constraint changes use `op.batch_alter_table`**
   (drop+recreate the named constraint). Always additive; test on a copy of `data/taskcentral.db`
   first. Env resolves the URL from app config (`alembic/env.py`).
 - **Adding a machine type / field** touches many spots in lockstep: enum in

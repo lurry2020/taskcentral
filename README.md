@@ -21,6 +21,8 @@ one-click Obsidian-ready Markdown document for your vault.
 - **Obsidian document generation** - per-type Jinja templates (sandboxed), rendered with live
   machine data; copy to clipboard, download as `.md`, versioned snapshots, restore/view history.
   Task Central never writes to your vault - the workflow is copy/paste or download by design.
+- **Document freshness alerts** - Overview, Services, Dependencies, and Notes changes flag the
+  affected machine on its header and in Dashboard Needs Attention until its document is regenerated.
 - **Dashboard** - summary cards, recent machines with progress, "needs attention" list.
 - **History** - audit-style activity log per machine.
 - **Data management** - full JSON export/import for every machine type (validated, with a
@@ -201,7 +203,7 @@ cd frontend && npm run build                       # production build
 | `APP_NAME`     | `Task Central`                   | Display name (also editable in Settings)        |
 | `APP_ENV`      | `production`                     | Environment label                               |
 | `APP_PORT`     | `8484`                           | Host port for the web UI                        |
-| `TASKCENTRAL_VERSION` | `1.1.4`                    | Installed application release                   |
+| `TASKCENTRAL_VERSION` | `1.1.5`                    | Installed application release                   |
 | `TASKCENTRAL_RELEASE_REPOSITORY` | `lurry2020/taskcentral` | Repository used to check for releases   |
 | `DATABASE_URL` | `sqlite:////data/taskcentral.db` | SQLAlchemy connection string                    |
 | `CORS_ORIGINS` | `http://localhost:8484`          | Comma-separated allowed origins                 |

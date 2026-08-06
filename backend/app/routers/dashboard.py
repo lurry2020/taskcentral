@@ -68,6 +68,8 @@ def dashboard(db: Session = Depends(get_db)):
             reasons.append(f"Missing: {', '.join(missing_fields)}")
         if m.id not in documented_ids and m.status not in ("Draft",):
             reasons.append("No Obsidian document generated")
+        elif m.obsidian_document_needs_regeneration:
+            reasons.append("Obsidian document needs regeneration")
         if reasons:
             attention.append(
                 AttentionItem(

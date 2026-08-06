@@ -1,6 +1,7 @@
 from datetime import date, datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Column,
     Date,
@@ -78,6 +79,9 @@ class Machine(Base, TimestampMixin):
     asset_tag: Mapped[str | None] = mapped_column(String(120))
 
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    obsidian_document_needs_regeneration: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
 
     tags: Mapped[list[Tag]] = relationship(
         secondary=machine_tags, back_populates="machines", order_by=Tag.name, lazy="selectin"

@@ -7,6 +7,19 @@ displays the running version and every older release in newest-first order.
 
 ## [Unreleased]
 
+## [1.1.5]
+
+### Added
+
+- Machines now track when Overview, Services, Dependencies, or Notes changes make their generated
+  Obsidian document outdated. A warning appears in the machine header and Dashboard Needs Attention
+  list until the document is regenerated.
+
+### Changed
+
+- Updated the sidebar branding with the Task Central logo and added a matching browser favicon
+  with transparent corners.
+
 ## [1.1.4]
 
 ### Changed

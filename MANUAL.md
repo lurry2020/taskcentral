@@ -642,6 +642,10 @@ browser, and no reachability history is stored. The header displays only plain `
 available. A device can be operational while appearing Offline if its host firewall, network
 firewall, or VLAN policy blocks ICMP echo requests.
 
+If Overview, Services, Dependencies, or Notes information has changed since the latest Obsidian
+document was generated, the header card displays an **Obsidian document needs regeneration**
+warning. Open the Obsidian tab and regenerate the document to clear the warning.
+
 Visible tabs vary by type:
 
 | Tab | VM/LXC/Physical | Host | Network |
@@ -1039,6 +1043,12 @@ Generating a document renders the template with the machine's current related da
 safe `.md` filename, and stores an immutable generated snapshot. The machine's Obsidian tab can
 copy or download the latest content and open previous snapshots.
 
+Task Central tracks document freshness per machine. Creating, editing, deleting, or reordering a
+Service; creating, editing, or deleting a Dependency or Note; or changing Overview information
+marks that machine's document as needing regeneration. The warning appears in the machine header
+and in Dashboard Needs Attention. A successful document generation clears it. Changes to
+checklists, reminders, storage, equipment, segments, or templates do not currently set this flag.
+
 Task Central never writes directly into an Obsidian vault.
 
 ### Typical workflow
@@ -1204,6 +1214,7 @@ A machine can need attention because it has:
 - Missing IP address or DNS record while not Draft or Retired
 - Missing VMID/CTID for a VM or LXC while not Draft or Retired
 - No generated Obsidian document while not Draft
+- An Obsidian document that needs regeneration after relevant machine information changed
 
 The Dashboard's completed state is derived from checklist progress, not from the machine's
 `Active` status.
@@ -2314,6 +2325,8 @@ normal Settings API.
 - Dependencies can point to another Machine or an external name.
 - Templates can be deleted without deleting their previously copied machine items.
 - Generated documents are snapshots and are not updated in place.
+- Each Machine stores whether relevant changes require its Obsidian document to be regenerated.
+  JSON export and import preserve this state.
 
 ### Seed behavior
 

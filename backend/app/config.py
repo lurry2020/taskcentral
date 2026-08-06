@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     app_name: str = "Task Central"
     app_env: str = "development"
-    taskcentral_version: str = "1.1.4"
+    taskcentral_version: str = "1.1.5"
     taskcentral_release_repository: str = "lurry2020/taskcentral"
     changelog_path: str = ""
     database_url: str = ""

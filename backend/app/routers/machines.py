@@ -33,6 +33,7 @@ from app.schemas.template import ActivityEventOut
 from app.services.activity import log_event
 from app.services.checklist import checklist_progress, generate_checklist
 from app.services.connectivity import ping_ip_address
+from app.services.documentation import mark_obsidian_document_outdated
 from app.services.hosts import link_existing_guests, sync_host_dependency
 from app.services.reminders import generate_reminders
 from app.models import ActivityEvent
@@ -296,12 +297,16 @@ def update_machine(machine_id: int, payload: MachineUpdate, db: Session = Depend
         k: getattr(machine, k)
         for k in payload.model_dump(exclude={"tags"})
     }
+    before_tags = {tag.name.casefold() for tag in machine.tags}
     _apply_fields(machine, payload, db)
     for key, old in before.items():
         new = getattr(machine, key)
         if str(old) != str(new):
             changed.append(key)
+    if before_tags != {tag.name.casefold() for tag in machine.tags}:
+        changed.append("tags")
     if changed:
+        mark_obsidian_document_outdated(machine)
         log_event(
             db,
             "machine_updated",

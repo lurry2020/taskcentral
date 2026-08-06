@@ -9,6 +9,7 @@ from app.models import GeneratedDocument, ObsidianTemplate
 from app.routers.helpers import get_machine_or_404
 from app.schemas.template import GeneratedDocumentListItem, GeneratedDocumentOut
 from app.services.activity import log_event
+from app.services.documentation import mark_obsidian_document_current
 from app.services.rendering import build_context, load_settings, render_template, safe_filename
 
 router = APIRouter(prefix="/machines/{machine_id}/documents", tags=["documents"])
@@ -50,6 +51,7 @@ def generate_document(machine_id: int, db: Session = Depends(get_db)):
         machine_id=machine.id, template_id=template.id, filename=filename, content=content
     )
     db.add(document)
+    mark_obsidian_document_current(machine)
     log_event(db, "document_generated", f"Obsidian document generated ({filename}).", machine.id)
     db.commit()
     db.refresh(document)

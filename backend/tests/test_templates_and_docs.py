@@ -54,6 +54,109 @@ def test_generate_document(client, machine):
     assert "attachment" in dl.headers["content-disposition"]
 
 
+def test_relevant_machine_changes_require_document_regeneration(client, machine):
+    machine_id = machine["id"]
+
+    def needs_regeneration() -> bool:
+        response = client.get(f"/api/v1/machines/{machine_id}")
+        assert response.status_code == 200
+        return response.json()["obsidian_document_needs_regeneration"]
+
+    def regenerate() -> None:
+        response = client.post(f"/api/v1/machines/{machine_id}/documents/generate")
+        assert response.status_code == 201, response.text
+        assert needs_regeneration() is False
+
+    assert needs_regeneration() is False
+    regenerate()
+
+    overview = client.put(
+        f"/api/v1/machines/{machine_id}",
+        json={
+            "name": machine["name"],
+            "machine_type": machine["machine_type"],
+            "status": "Active",
+            "ip_address": machine["ip_address"],
+            "vmid": machine["vmid"],
+            "purpose": "Updated overview details",
+            "tags": machine["tags"],
+        },
+    )
+    assert overview.status_code == 200, overview.text
+    assert needs_regeneration() is True
+    regenerate()
+
+    tags_only = client.put(
+        f"/api/v1/machines/{machine_id}",
+        json={
+            "name": machine["name"],
+            "machine_type": machine["machine_type"],
+            "status": "Active",
+            "ip_address": machine["ip_address"],
+            "vmid": machine["vmid"],
+            "purpose": "Updated overview details",
+            "tags": ["documentation-only-change"],
+        },
+    )
+    assert tags_only.status_code == 200, tags_only.text
+    assert needs_regeneration() is True
+    regenerate()
+
+    service = client.post(
+        f"/api/v1/machines/{machine_id}/services",
+        json={"name": "Documentation test service", "port": 8080},
+    ).json()
+    assert needs_regeneration() is True
+    regenerate()
+    client.put(
+        f"/api/v1/machines/{machine_id}/services/{service['id']}",
+        json={"name": "Updated documentation test service", "port": 8081},
+    )
+    assert needs_regeneration() is True
+    regenerate()
+    client.delete(f"/api/v1/machines/{machine_id}/services/{service['id']}")
+    assert needs_regeneration() is True
+    regenerate()
+
+    dependency = client.post(
+        f"/api/v1/machines/{machine_id}/dependencies",
+        json={"external_name": "Documentation dependency", "dependency_type": "Other"},
+    ).json()
+    assert needs_regeneration() is True
+    regenerate()
+    client.put(
+        f"/api/v1/machines/{machine_id}/dependencies/{dependency['id']}",
+        json={"external_name": "Updated dependency", "dependency_type": "Application"},
+    )
+    assert needs_regeneration() is True
+    regenerate()
+    client.delete(f"/api/v1/machines/{machine_id}/dependencies/{dependency['id']}")
+    assert needs_regeneration() is True
+    regenerate()
+
+    note = client.post(
+        f"/api/v1/machines/{machine_id}/notes",
+        json={"title": "Documentation note", "content": "Initial content"},
+    ).json()
+    assert needs_regeneration() is True
+    client.put(
+        f"/api/v1/machines/{machine_id}/notes/{note['id']}",
+        json={"title": "Documentation note", "content": "Updated content"},
+    )
+    assert needs_regeneration() is True
+    dashboard = client.get("/api/v1/dashboard").json()
+    attention = next(item for item in dashboard["needs_attention"] if item["machine_id"] == machine_id)
+    assert "Obsidian document needs regeneration" in attention["reasons"]
+
+    regenerate()
+    dashboard = client.get("/api/v1/dashboard").json()
+    attention = next(item for item in dashboard["needs_attention"] if item["machine_id"] == machine_id)
+    assert "Obsidian document needs regeneration" not in attention["reasons"]
+
+    client.delete(f"/api/v1/machines/{machine_id}/notes/{note['id']}")
+    assert needs_regeneration() is True
+
+
 def test_document_fills_reverse_dependencies(client, machine):
     dependent = client.post(
         "/api/v1/machines", json={"name": "jellyfin-01", "machine_type": "LXC"}

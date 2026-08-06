@@ -85,8 +85,13 @@ function Brand() {
   const { data: settings } = useSettings();
   return (
     <div className="flex items-center gap-3 px-5 py-5">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-b from-accent to-accent-deep text-white shadow-[0_1px_0_0_#ffffff33_inset,0_4px_12px_-4px_var(--color-accent)]">
-        <ListChecks className="h-4.5 w-4.5" aria-hidden />
+      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-xl shadow-[0_4px_12px_-4px_var(--color-accent)]">
+        <img
+          src="/logo.png"
+          alt=""
+          className="h-full w-full scale-[1.04] object-cover object-center"
+          aria-hidden
+        />
       </div>
       <div className="leading-tight">
         <p className="text-[0.9rem] font-semibold tracking-tight">

@@ -133,6 +133,8 @@ def test_export_import_roundtrip(client, machine):
     assert machines["total"] == 1
     services = client.get(f"/api/v1/machines/{machine['id']}/services").json()
     assert [s["name"] for s in services] == ["Pi-hole"]
+    restored_machine = client.get(f"/api/v1/machines/{machine['id']}").json()
+    assert restored_machine["obsidian_document_needs_regeneration"] is True
 
     # invalid file rejected
     resp = client.post("/api/v1/data/import", json={"format": "nope"})

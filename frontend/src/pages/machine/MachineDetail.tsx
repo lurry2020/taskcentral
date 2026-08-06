@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import { Archive, ArchiveRestore, Copy, Loader2, Pencil, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  Archive,
+  ArchiveRestore,
+  Copy,
+  Loader2,
+  Pencil,
+  RefreshCw,
+} from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { TagBadge, TypeBadge } from "@/components/ui/Badge";
@@ -212,6 +220,29 @@ export function MachineDetail() {
               {machine.progress.progress_percent}%
             </span>
           </div>
+          {machine.obsidian_document_needs_regeneration && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn-soft px-3.5 py-3">
+              <div className="flex min-w-0 items-start gap-2.5">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden />
+                <div>
+                  <p className="text-sm font-medium text-text">
+                    Obsidian document needs regeneration
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted">
+                    Machine information changed since the document was last generated.
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => navigate(`/inventory/${id}/obsidian`)}
+              >
+                Open Obsidian
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Tabs */}

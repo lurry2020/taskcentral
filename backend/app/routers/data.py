@@ -55,7 +55,8 @@ MACHINE_FIELDS = [
     "purpose", "responsibilities", "isp", "connection_type", "download_speed", "upload_speed",
     "wan_type", "location", "owner", "deployment_date", "cpu", "cpu_cores", "memory_value",
     "memory_unit", "disk_value", "disk_unit", "storage_location", "gpu", "network_interface",
-    "hardware_model", "serial_number", "asset_tag", "archived_at", "created_at", "updated_at",
+    "hardware_model", "serial_number", "asset_tag", "archived_at",
+    "obsidian_document_needs_regeneration", "created_at", "updated_at",
 ]
 SERVICE_FIELDS = [
     "id", "machine_id", "name", "description", "port", "protocol", "url", "is_external",
