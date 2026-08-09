@@ -15,7 +15,10 @@ services:
       LOG_DIR: /logs
       LOG_MAX_BYTES: ${LOG_MAX_BYTES:-5242880}
       LOG_BACKUP_COUNT: ${LOG_BACKUP_COUNT:-5}
-      SETUP_ACCESS_TOKEN: ${SETUP_ACCESS_TOKEN:?SETUP_ACCESS_TOKEN is missing from .env}
+      # Older releases generated SECRET_KEY but did not have SETUP_ACCESS_TOKEN.
+      # Use that existing random secret for the one-time compatibility upgrade;
+      # install.sh/update.sh persist a dedicated setup token going forward.
+      SETUP_ACCESS_TOKEN: ${SETUP_ACCESS_TOKEN:-${SECRET_KEY:-}}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       DEMO_MODE: ${DEMO_MODE:-false}
       AUTH_USERNAME: ${AUTH_USERNAME:-admin}

@@ -66,4 +66,11 @@ jobs:
             -e 's|__GENERATE__|test-only-secret|g' \
             release/.env
           docker compose --env-file release/.env -f release/compose.yml config --quiet
+          sed -i '/^SETUP_ACCESS_TOKEN=/d' release/.env
+          printf '%s\n' 'SECRET_KEY=legacy-random-secret-1234567890abcdef' >> release/.env
+          resolved_setup_token="$(
+            docker compose --env-file release/.env -f release/compose.yml config --format json |
+              python -c 'import json,sys; print(json.load(sys.stdin)["services"]["backend"]["environment"]["SETUP_ACCESS_TOKEN"])'
+          )"
+          test "$resolved_setup_token" = 'legacy-random-secret-1234567890abcdef'
           rm release/.env

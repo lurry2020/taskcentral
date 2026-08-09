@@ -16,7 +16,9 @@ services:
       LOG_DIR: /logs
       LOG_MAX_BYTES: ${LOG_MAX_BYTES:-5242880}
       LOG_BACKUP_COUNT: ${LOG_BACKUP_COUNT:-5}
-      SETUP_ACCESS_TOKEN: ${SETUP_ACCESS_TOKEN:?Set SETUP_ACCESS_TOKEN in .env}
+      # Permit upgrades from source installs that still have the former random
+      # SECRET_KEY. Production validation rejects missing or weak values.
+      SETUP_ACCESS_TOKEN: ${SETUP_ACCESS_TOKEN:-${SECRET_KEY:-}}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       DEMO_MODE: ${DEMO_MODE:-false}
       AUTH_USERNAME: ${AUTH_USERNAME:-admin}

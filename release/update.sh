@@ -101,8 +101,19 @@ restore_release_files() {
 install_release_files() {
   local bundle_dir="$1"
   local file
+  local staged_file
   for file in "${MANAGED_RELEASE_FILES[@]}"; do
-    cp -p "$bundle_dir/$file" "$SCRIPT_DIR/$file" || return 1
+    # Replace management files atomically. In particular, never truncate the
+    # update script while Bash is still executing it from the old release.
+    staged_file="$(mktemp "$SCRIPT_DIR/.taskcentral-release-file.XXXXXX")" || return 1
+    if ! cp -p "$bundle_dir/$file" "$staged_file"; then
+      rm -f -- "$staged_file"
+      return 1
+    fi
+    if ! mv -f -- "$staged_file" "$SCRIPT_DIR/$file"; then
+      rm -f -- "$staged_file"
+      return 1
+    fi
   done
   chmod 755 \
     "$SCRIPT_DIR/_common.sh" \

@@ -16,6 +16,7 @@ displays the running version and every older release in newest-first order.
 - Hardened Local AI connections against unsafe network requests.
 - Added browser security protections.
 - Improved security around application resets and data imports.
+- Improved update compatibility for installations upgrading from earlier releases.
 
 ## [1.1.5]
 
