@@ -1,9 +1,10 @@
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.config import get_settings
 from app.schemas.settings import (
     LLMModelsRequest,
     LLMModelsResult,
@@ -23,7 +24,7 @@ from app.services.llm import (
     list_local_llm_models,
     test_local_llm,
 )
-from app.services.setup import complete_setup, is_setup_complete, require_setup_incomplete
+from app.services.setup import complete_setup, is_setup_complete, require_setup_access
 from app.services.telegram import send_telegram_message
 
 router = APIRouter(prefix="/setup", tags=["setup"])
@@ -33,15 +34,20 @@ logger = logging.getLogger(__name__)
 @router.get("/status", response_model=SetupStatus)
 def setup_status(db: Session = Depends(get_db)):
     completed = is_setup_complete(db)
-    return SetupStatus(completed=completed, required=not completed)
+    return SetupStatus(
+        completed=completed,
+        required=not completed,
+        access_required=bool(get_settings().setup_access_token),
+    )
 
 
 @router.post("/test-telegram", response_model=TelegramTestResult)
 def test_setup_telegram(
     payload: SetupTelegramTestRequest,
     db: Session = Depends(get_db),
+    setup_token: str = Header(default="", alias="X-TaskCentral-Setup-Token"),
 ):
-    require_setup_incomplete(db)
+    require_setup_access(db, setup_token)
     ok, message = send_telegram_message(
         payload.telegram_bot_token,
         payload.telegram_chat_id,
@@ -51,8 +57,12 @@ def test_setup_telegram(
 
 
 @router.post("/test-llm", response_model=LLMTestResult)
-def test_setup_llm(payload: LLMTestRequest, db: Session = Depends(get_db)):
-    require_setup_incomplete(db)
+def test_setup_llm(
+    payload: LLMTestRequest,
+    db: Session = Depends(get_db),
+    setup_token: str = Header(default="", alias="X-TaskCentral-Setup-Token"),
+):
+    require_setup_access(db, setup_token)
     config = LocalLLMConfig(
         provider=payload.llm_provider,
         base_url=payload.llm_base_url,
@@ -70,8 +80,12 @@ def test_setup_llm(payload: LLMTestRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/llm-models", response_model=LLMModelsResult)
-def setup_llm_models(payload: LLMModelsRequest, db: Session = Depends(get_db)):
-    require_setup_incomplete(db)
+def setup_llm_models(
+    payload: LLMModelsRequest,
+    db: Session = Depends(get_db),
+    setup_token: str = Header(default="", alias="X-TaskCentral-Setup-Token"),
+):
+    require_setup_access(db, setup_token)
     config = LocalLLMConfig(
         provider=payload.llm_provider,
         base_url=payload.llm_base_url,
@@ -94,6 +108,11 @@ def setup_llm_models(payload: LLMModelsRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/complete", response_model=SetupCompleteResult)
-def finish_setup(payload: SetupCompleteRequest, db: Session = Depends(get_db)):
+def finish_setup(
+    payload: SetupCompleteRequest,
+    db: Session = Depends(get_db),
+    setup_token: str = Header(default="", alias="X-TaskCentral-Setup-Token"),
+):
+    require_setup_access(db, setup_token)
     complete_setup(db, payload)
     return SetupCompleteResult()

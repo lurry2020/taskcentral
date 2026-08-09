@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 type Provider = "ollama" | "openai_compatible";
 
 interface SetupDraft {
+  setupAccessToken: string;
   username: string;
   password: string;
   passwordConfirmation: string;
@@ -62,9 +63,16 @@ function providerLabel(provider: Provider): string {
   return provider === "ollama" ? "Ollama" : "OpenAI-compatible local server";
 }
 
-export function SetupPage({ onComplete }: { onComplete: () => void }) {
+export function SetupPage({
+  onComplete,
+  accessRequired,
+}: {
+  onComplete: () => void;
+  accessRequired: boolean;
+}) {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<SetupDraft>({
+    setupAccessToken: "",
     username: "",
     password: "",
     passwordConfirmation: "",
@@ -110,6 +118,9 @@ export function SetupPage({ onComplete }: { onComplete: () => void }) {
 
   const validateStep = (): string | null => {
     if (step === 0) {
+      if (accessRequired && !draft.setupAccessToken.trim()) {
+        return "Setup access code is required.";
+      }
       if (!draft.username.trim()) return "Username is required.";
       if (draft.password.length < 6) return "Password must be at least 6 characters.";
       if (draft.password !== draft.passwordConfirmation) return "Passwords do not match.";
@@ -172,10 +183,14 @@ export function SetupPage({ onComplete }: { onComplete: () => void }) {
     setTestingTelegram(true);
     setTelegramResult(null);
     try {
-      const result = await api.post<{ ok: boolean; message: string }>("/setup/test-telegram", {
-        telegram_bot_token: draft.telegramBotToken,
-        telegram_chat_id: draft.telegramChatId,
-      });
+      const result = await api.post<{ ok: boolean; message: string }>(
+        "/setup/test-telegram",
+        {
+          telegram_bot_token: draft.telegramBotToken,
+          telegram_chat_id: draft.telegramChatId,
+        },
+        { "X-TaskCentral-Setup-Token": draft.setupAccessToken.trim() },
+      );
       setTelegramResult(result);
     } catch (err) {
       setTelegramResult({ ok: false, message: (err as Error).message });
@@ -193,13 +208,17 @@ export function SetupPage({ onComplete }: { onComplete: () => void }) {
     setTestingLlm(true);
     setLlmResult(null);
     try {
-      const result = await api.post<{ ok: boolean; message: string }>("/setup/test-llm", {
-        llm_provider: draft.llmProvider,
-        llm_base_url: draft.llmBaseUrl,
-        llm_model: draft.llmModel,
-        llm_api_key: draft.llmApiKey,
-        llm_timeout_seconds: draft.llmTimeoutSeconds,
-      });
+      const result = await api.post<{ ok: boolean; message: string }>(
+        "/setup/test-llm",
+        {
+          llm_provider: draft.llmProvider,
+          llm_base_url: draft.llmBaseUrl,
+          llm_model: draft.llmModel,
+          llm_api_key: draft.llmApiKey,
+          llm_timeout_seconds: draft.llmTimeoutSeconds,
+        },
+        { "X-TaskCentral-Setup-Token": draft.setupAccessToken.trim() },
+      );
       setLlmResult(result);
     } catch (err) {
       setLlmResult({ ok: false, message: (err as Error).message });
@@ -212,22 +231,26 @@ export function SetupPage({ onComplete }: { onComplete: () => void }) {
     setCompleting(true);
     setError(null);
     try {
-      await api.post<{ completed: true }>("/setup/complete", {
-        username: draft.username.trim(),
-        password: draft.password,
-        password_confirmation: draft.passwordConfirmation,
-        timezone: draft.timezone,
-        date_format: draft.dateFormat,
-        telegram_configured: !draft.telegramSkipped,
-        telegram_bot_token: draft.telegramSkipped ? "" : draft.telegramBotToken,
-        telegram_chat_id: draft.telegramSkipped ? "" : draft.telegramChatId,
-        llm_configured: !draft.llmSkipped,
-        llm_provider: draft.llmProvider,
-        llm_base_url: draft.llmSkipped ? "" : draft.llmBaseUrl,
-        llm_model: draft.llmSkipped ? "" : draft.llmModel,
-        llm_api_key: draft.llmSkipped ? "" : draft.llmApiKey,
-        llm_timeout_seconds: draft.llmTimeoutSeconds,
-      });
+      await api.post<{ completed: true }>(
+        "/setup/complete",
+        {
+          username: draft.username.trim(),
+          password: draft.password,
+          password_confirmation: draft.passwordConfirmation,
+          timezone: draft.timezone,
+          date_format: draft.dateFormat,
+          telegram_configured: !draft.telegramSkipped,
+          telegram_bot_token: draft.telegramSkipped ? "" : draft.telegramBotToken,
+          telegram_chat_id: draft.telegramSkipped ? "" : draft.telegramChatId,
+          llm_configured: !draft.llmSkipped,
+          llm_provider: draft.llmProvider,
+          llm_base_url: draft.llmSkipped ? "" : draft.llmBaseUrl,
+          llm_model: draft.llmSkipped ? "" : draft.llmModel,
+          llm_api_key: draft.llmSkipped ? "" : draft.llmApiKey,
+          llm_timeout_seconds: draft.llmTimeoutSeconds,
+        },
+        { "X-TaskCentral-Setup-Token": draft.setupAccessToken.trim() },
+      );
       onComplete();
     } catch (err) {
       setError((err as Error).message || "Setup could not be completed.");
@@ -310,6 +333,24 @@ export function SetupPage({ onComplete }: { onComplete: () => void }) {
           <div className="min-h-[19rem] px-6 py-5">
             {step === 0 && (
               <div className="mx-auto max-w-md space-y-4">
+                {accessRequired && (
+                  <FormField
+                    label="Setup access code"
+                    htmlFor="setup-access-code"
+                    hint="Shown by install.sh and stored in the installation .env file"
+                  >
+                    <Input
+                      id="setup-access-code"
+                      type="password"
+                      value={draft.setupAccessToken}
+                      onChange={(event) => set("setupAccessToken", event.target.value)}
+                      required
+                      autoComplete="off"
+                      spellCheck={false}
+                      autoFocus
+                    />
+                  </FormField>
+                )}
                 <FormField
                   label="Username"
                   htmlFor="setup-username"
@@ -323,7 +364,7 @@ export function SetupPage({ onComplete }: { onComplete: () => void }) {
                     autoComplete="off"
                     autoCapitalize="none"
                     spellCheck={false}
-                    autoFocus
+                    autoFocus={!accessRequired}
                   />
                 </FormField>
                 <FormField
@@ -532,6 +573,7 @@ export function SetupPage({ onComplete }: { onComplete: () => void }) {
                   }}
                   className="sm:col-span-2"
                   required
+                  setupAccessToken={draft.setupAccessToken.trim()}
                 />
                 <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
                   <Button

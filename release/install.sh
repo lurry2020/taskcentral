@@ -35,8 +35,14 @@ else
   chmod 600 "$ENV_FILE"
   set_env APP_PORT "$selected_port"
   set_env CORS_ORIGINS "http://localhost:$selected_port"
-  set_env SECRET_KEY "$(random_hex)"
+  set_env SETUP_ACCESS_TOKEN "$(random_hex)"
   set_env AUTH_PASSWORD "$(random_hex)"
+fi
+
+# Older release installations do not have this setting yet. Add it without
+# changing their database, login credentials, port, or other configuration.
+if [[ -z "$(read_env SETUP_ACCESS_TOKEN)" || "$(read_env SETUP_ACCESS_TOKEN)" == "__GENERATE__" ]]; then
+  set_env SETUP_ACCESS_TOKEN "$(random_hex)"
 fi
 
 mkdir -p "$DATA_DIR" "$BACKUP_DIR" "$LOG_DIR"
@@ -53,4 +59,5 @@ if ! wait_for_healthy; then
 fi
 
 info "Installation complete."
+info "Setup access code: $(read_env SETUP_ACCESS_TOKEN)"
 info "Open $(application_url) and complete the first-run setup wizard."

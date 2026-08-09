@@ -1,35 +1,25 @@
-"""Single-user login: HMAC-signed session tokens (stdlib only, no dependency)."""
+"""Single-user credentials and revocable opaque browser sessions."""
 
-import base64
 import hashlib
 import hmac
 import json
 import os
-import time
+import secrets
+from datetime import timezone, timedelta
 
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import ApplicationSetting
+from app.models import ApplicationSetting, AuthSession
+from app.models.base import utcnow
 
 # A password override set via the CLI (`setpassword`) lives in application_settings,
 # stored as a salted PBKDF2 hash. When present it takes precedence over AUTH_PASSWORD.
 PASSWORD_HASH_KEY = "auth_password_hash"
 USERNAME_KEY = "auth_username"
 _PBKDF2_ITERATIONS = 200_000
-
-
-def _b64encode(raw: bytes) -> str:
-    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
-
-
-def _b64decode(text: str) -> bytes:
-    return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
-
-
-def _sign(body: str) -> str:
-    secret = get_settings().secret_key.encode("utf-8")
-    return _b64encode(hmac.new(secret, body.encode("ascii"), hashlib.sha256).digest())
+SESSION_COOKIE_NAME = "taskcentral_session"
 
 
 def hash_password(password: str, iterations: int = _PBKDF2_ITERATIONS) -> str:
@@ -75,6 +65,7 @@ def get_login_username(db: Session) -> str:
 
 
 def set_login_username(db: Session, username: str) -> None:
+    revoke_all_sessions(db)
     value = json.dumps(username.strip())
     row = db.get(ApplicationSetting, USERNAME_KEY)
     if row is None:
@@ -85,6 +76,7 @@ def set_login_username(db: Session, username: str) -> None:
 
 def set_password(db: Session, password: str) -> None:
     """Store a new login password (hashed). Overrides AUTH_PASSWORD until cleared."""
+    revoke_all_sessions(db)
     value = json.dumps(hash_password(password))
     row = db.get(ApplicationSetting, PASSWORD_HASH_KEY)
     if row is None:
@@ -98,6 +90,7 @@ def clear_password(db: Session) -> bool:
     row = db.get(ApplicationSetting, PASSWORD_HASH_KEY)
     if row is None:
         return False
+    revoke_all_sessions(db)
     db.delete(row)
     return True
 
@@ -117,27 +110,50 @@ def check_credentials(db: Session, username: str | None, password: str | None) -
     return user_ok and pass_ok
 
 
-def create_token(username: str) -> str:
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def revoke_all_sessions(db: Session) -> None:
+    db.execute(delete(AuthSession))
+
+
+def create_session(db: Session, username: str) -> tuple[str, int]:
+    """Create a random opaque session and return its cookie value and lifetime."""
     settings = get_settings()
-    payload = {
-        "sub": username,
-        "exp": int(time.time()) + settings.auth_token_ttl_hours * 3600,
-    }
-    body = _b64encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    return f"{body}.{_sign(body)}"
+    lifetime_seconds = settings.auth_token_ttl_hours * 3600
+    now = utcnow()
+    db.execute(delete(AuthSession).where(AuthSession.expires_at <= now))
+    token = secrets.token_urlsafe(48)
+    db.add(
+        AuthSession(
+            token_hash=_token_hash(token),
+            username=username,
+            expires_at=now + timedelta(seconds=lifetime_seconds),
+        )
+    )
+    return token, lifetime_seconds
 
 
-def verify_token(token: str | None) -> str | None:
-    """Return the subject (username) for a valid, unexpired token, else None."""
-    if not token or "." not in token:
+def authenticate_session(db: Session, token: str | None) -> str | None:
+    """Return the username for an active server-side session, else None."""
+    if not token:
         return None
-    body, signature = token.split(".", 1)
-    if not hmac.compare_digest(signature, _sign(body)):
+    session = db.scalar(
+        select(AuthSession).where(AuthSession.token_hash == _token_hash(token))
+    )
+    if session is None:
         return None
-    try:
-        payload = json.loads(_b64decode(body))
-    except Exception:
+    expires_at = session.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at <= utcnow():
         return None
-    if int(payload.get("exp", 0)) < time.time():
+    if session.username.casefold() != get_login_username(db).casefold():
         return None
-    return payload.get("sub")
+    return session.username
+
+
+def revoke_session(db: Session, token: str | None) -> None:
+    if token:
+        db.execute(delete(AuthSession).where(AuthSession.token_hash == _token_hash(token)))

@@ -9,6 +9,7 @@ from app.services.llm import validate_local_base_url
 class SetupStatus(BaseModel):
     completed: bool
     required: bool
+    access_required: bool
 
 
 class SetupCompleteRequest(BaseModel):

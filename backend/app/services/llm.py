@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import ipaddress
+import http.client
 import json
 import logging
 import re
 import socket
-import urllib.error
+import ssl
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,7 +20,23 @@ logger = logging.getLogger(__name__)
 
 LOCAL_HOSTS = {"localhost", "host.docker.internal", "host.containers.internal"}
 LOCAL_SUFFIXES = (".local", ".lan", ".home", ".internal", ".home.arpa")
-HOST_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$")
+HOST_LABEL_RE = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9_-]{0,61}[a-zA-Z0-9])?$")
+AMBIGUOUS_IP_RE = re.compile(
+    r"^(?:0x[0-9a-f]+|[0-9]+)(?:\.(?:0x[0-9a-f]+|[0-9]+))*$",
+    re.IGNORECASE,
+)
+ALLOWED_NETWORKS = tuple(
+    ipaddress.ip_network(value)
+    for value in (
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "127.0.0.0/8",
+        "::1/128",
+        "fc00::/7",
+    )
+)
+MAX_LOCAL_AI_RESPONSE_BYTES = 5 * 1024 * 1024
 WORD_RE = re.compile(r"[a-z0-9][a-z0-9_-]{2,}")
 STOP_WORDS = {
     "about", "after", "again", "also", "and", "are", "can", "does", "for", "from",
@@ -44,7 +61,44 @@ class LocalLLMConfig:
 
 def _is_local_ip(value: str) -> bool:
     ip = ipaddress.ip_address(value)
-    return ip.is_private or ip.is_loopback or ip.is_link_local
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return any(ip in network for network in ALLOWED_NETWORKS if ip.version == network.version)
+
+
+def _validate_hostname_syntax(hostname: str) -> None:
+    if len(hostname) > 253 or AMBIGUOUS_IP_RE.fullmatch(hostname):
+        raise ValueError("Ambiguous or numeric hostnames are not allowed for local AI")
+    labels = hostname.split(".")
+    if not labels or any(not HOST_LABEL_RE.fullmatch(label) for label in labels):
+        raise ValueError("Local AI URL contains an invalid hostname")
+
+
+def _resolve_allowed_addresses(hostname: str, port: int | None) -> tuple[str, ...]:
+    try:
+        literal = ipaddress.ip_address(hostname)
+    except ValueError:
+        literal = None
+    if literal is not None:
+        if not _is_local_ip(str(literal)):
+            raise ValueError("Only loopback or private-network AI endpoints are allowed")
+        return (str(literal),)
+
+    _validate_hostname_syntax(hostname)
+    try:
+        addresses = tuple(
+            dict.fromkeys(
+                info[4][0]
+                for info in socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
+            )
+        )
+    except OSError as exc:
+        raise ValueError(
+            "Local AI hostname must resolve to a loopback or private-network address"
+        ) from exc
+    if not addresses or not all(_is_local_ip(address) for address in addresses):
+        raise ValueError("Only loopback or private-network AI endpoints are allowed")
+    return addresses
 
 
 def validate_local_base_url(value: str) -> str:
@@ -58,33 +112,14 @@ def validate_local_base_url(value: str) -> str:
     if parsed.query or parsed.fragment:
         raise ValueError("Local AI URL must not contain a query string or fragment")
 
-    hostname = parsed.hostname.rstrip(".").lower()
     try:
-        if _is_local_ip(hostname):
-            return value
-        raise ValueError("Public IP addresses are not allowed for local AI")
+        port = parsed.port
     except ValueError as exc:
-        if "Public IP" in str(exc):
-            raise
-
-    if (
-        hostname in LOCAL_HOSTS
-        or hostname.endswith(LOCAL_SUFFIXES)
-        or HOST_RE.fullmatch(hostname)
-    ):
+        raise ValueError("Local AI URL contains an invalid port") from exc
+    hostname = parsed.hostname.rstrip(".").lower()
+    if hostname in LOCAL_HOSTS:
         return value
-
-    try:
-        addresses = {
-            info[4][0]
-            for info in socket.getaddrinfo(hostname, parsed.port, type=socket.SOCK_STREAM)
-        }
-    except OSError as exc:
-        raise ValueError(
-            "Local AI hostname must be a private IP, local name, or resolvable private host"
-        ) from exc
-    if not addresses or not all(_is_local_ip(address) for address in addresses):
-        raise ValueError("Only local or private-network AI endpoints are allowed")
+    _resolve_allowed_addresses(hostname, port)
     return value
 
 
@@ -126,43 +161,71 @@ def _models_endpoint(config: LocalLLMConfig) -> str:
     return base if base.endswith("/models") else f"{base}/models"
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
-
-
 def _open_json(request: urllib.request.Request, timeout_seconds: int) -> dict:
-    opener = urllib.request.build_opener(_NoRedirect)
+    parsed = urlparse(request.full_url)
+    hostname = (parsed.hostname or "").rstrip(".").lower()
     try:
-        with opener.open(request, timeout=timeout_seconds) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = ""
-        try:
-            body = json.loads(exc.read().decode("utf-8"))
-            detail = body.get("error") or body.get("detail") or body.get("message") or ""
-            if isinstance(detail, dict):
-                detail = detail.get("message") or str(detail)
-        except Exception:
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    except ValueError as exc:
+        raise LocalLLMError("The local AI URL contains an invalid port.") from exc
+    try:
+        resolved_ip = _resolve_allowed_addresses(hostname, port)[0]
+    except ValueError as exc:
+        logger.error("Blocked local AI destination %s: %s", request.full_url, exc)
+        raise LocalLLMError("The local AI destination is not an allowed private address.") from exc
+
+    connection_class = (
+        http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+    )
+    connection = connection_class(hostname, port, timeout=timeout_seconds)
+
+    def create_pinned_connection(_address, timeout=None, source_address=None):
+        return socket.create_connection(
+            (resolved_ip, port),
+            timeout if timeout is not None else timeout_seconds,
+            source_address,
+        )
+
+    connection._create_connection = create_pinned_connection
+    path = parsed.path or "/"
+    if parsed.params:
+        path = f"{path};{parsed.params}"
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+    headers = dict(request.header_items())
+    host_header = f"[{hostname}]" if ":" in hostname else hostname
+    default_port = 443 if parsed.scheme == "https" else 80
+    headers["Host"] = host_header if port == default_port else f"{host_header}:{port}"
+    try:
+        connection.request(request.method, path, body=request.data, headers=headers)
+        response = connection.getresponse()
+        raw = response.read(MAX_LOCAL_AI_RESPONSE_BYTES + 1)
+        if len(raw) > MAX_LOCAL_AI_RESPONSE_BYTES:
+            raise LocalLLMError("The local AI response exceeded the allowed size.")
+        if response.status < 200 or response.status >= 300:
             detail = ""
-        suffix = f": {str(detail)[:500]}" if detail else ""
-        logger.error(
-            "Local AI HTTP request failed: %s %s -> %s%s",
-            request.method,
-            request.full_url,
-            exc.code,
-            suffix,
-        )
-        raise LocalLLMError(f"Local AI returned HTTP {exc.code}{suffix}") from exc
-    except urllib.error.URLError as exc:
-        logger.error(
-            "Local AI connection failed: %s %s (%s)",
-            request.method,
-            request.full_url,
-            exc.reason,
-        )
-        raise LocalLLMError(f"Could not reach the local AI server: {exc.reason}") from exc
-    except TimeoutError as exc:
+            try:
+                body = json.loads(raw.decode("utf-8"))
+                detail = body.get("error") or body.get("detail") or body.get("message") or ""
+                if isinstance(detail, dict):
+                    detail = detail.get("message") or str(detail)
+            except Exception:
+                detail = ""
+            log_suffix = f": {str(detail)[:500]}" if detail else ""
+            logger.error(
+                "Local AI HTTP request failed: %s %s -> %s%s",
+                request.method,
+                request.full_url,
+                response.status,
+                log_suffix,
+            )
+            raise LocalLLMError(
+                f"Local AI returned HTTP {response.status}. Check the Task Central log for details."
+            )
+        return json.loads(raw.decode("utf-8"))
+    except LocalLLMError:
+        raise
+    except (TimeoutError, socket.timeout) as exc:
         logger.error(
             "Local AI request timed out: %s %s after %ss",
             request.method,
@@ -170,6 +233,14 @@ def _open_json(request: urllib.request.Request, timeout_seconds: int) -> dict:
             timeout_seconds,
         )
         raise LocalLLMError("The local AI request timed out.") from exc
+    except (OSError, ssl.SSLError, http.client.HTTPException) as exc:
+        logger.error(
+            "Local AI connection failed: %s %s (%s)",
+            request.method,
+            request.full_url,
+            exc,
+        )
+        raise LocalLLMError("Could not reach the local AI server. Check the Task Central log.") from exc
     except json.JSONDecodeError as exc:
         logger.error(
             "Local AI returned invalid JSON: %s %s",
@@ -177,6 +248,8 @@ def _open_json(request: urllib.request.Request, timeout_seconds: int) -> dict:
             request.full_url,
         )
         raise LocalLLMError("The local AI server returned invalid JSON.") from exc
+    finally:
+        connection.close()
 
 
 def _post_json(config: LocalLLMConfig, messages: list[dict[str, str]]) -> dict:

@@ -7,12 +7,11 @@ from sqlalchemy.orm import sessionmaker
 
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 
-from app.config import get_settings  # noqa: E402
 from app.database import build_engine, get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import ApplicationSetting, Base  # noqa: E402
 from app.services.setup import SETUP_COMPLETED_KEY  # noqa: E402
-from app.services.auth import create_token  # noqa: E402
+from app.services.auth import SESSION_COOKIE_NAME, create_session, get_login_username  # noqa: E402
 from app.services.seed import seed_all  # noqa: E402
 
 
@@ -34,7 +33,11 @@ def db_session(tmp_path):
 
 
 @pytest.fixture()
-def client(db_session):
+def client(db_session, monkeypatch):
+    import app.main as app_main
+
+    monkeypatch.setattr(app_main, "SessionLocal", db_session)
+
     def override_get_db():
         db = db_session()
         try:
@@ -43,10 +46,18 @@ def client(db_session):
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
-    # lifespan seeding hits the real DB config; use a plain TestClient without lifespan side effects.
-    # Authenticate every request (auth middleware protects all /api/v1 routes).
-    token = create_token(get_settings().auth_username)
-    with TestClient(app, raise_server_exceptions=True, headers={"Authorization": f"Bearer {token}"}) as c:
+    # Authenticate every request with an isolated server-side session.
+    db = db_session()
+    token, _ = create_session(db, get_login_username(db))
+    db.commit()
+    db.close()
+    with TestClient(app, raise_server_exceptions=True) as c:
+        c.cookies.set(
+            SESSION_COOKIE_NAME,
+            token,
+            domain="testserver.local",
+            path="/api",
+        )
         yield c
     app.dependency_overrides.clear()
 

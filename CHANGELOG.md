@@ -7,6 +7,16 @@ displays the running version and every older release in newest-first order.
 
 ## [Unreleased]
 
+## [1.1.6]
+
+### Security
+
+- Improved authentication and session security.
+- Strengthened first-run setup protection.
+- Hardened Local AI connections against unsafe network requests.
+- Added browser security protections.
+- Improved security around application resets and data imports.
+
 ## [1.1.5]
 
 ### Added

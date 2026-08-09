@@ -112,9 +112,10 @@ cd "taskcentral-${taskcentral_version}"
 ./install.sh
 ```
 
-The installer asks for the port (default `8484`), generates unique secrets, creates persistent
-`data/` and `backups/` directories, pulls pinned images, starts the application, and waits for
-health checks. Open the printed URL and complete the one-time `/setup` wizard.
+The installer asks for the port (default `8484`), generates a unique setup access code and fallback
+password, creates persistent `data/` and `backups/` directories, pulls pinned images, starts the
+application, and waits for health checks. Keep the printed setup access code, open the printed URL,
+and enter that code on the one-time `/setup` wizard.
 
 Release images support Linux `amd64` and `arm64`. Users do not need Git, Python, Node.js, or a
 local compiler.
@@ -156,6 +157,9 @@ Developers and source-based deployments can still build locally:
 ```bash
 cd /taskcentral
 cp .env.example .env
+setup_access_token=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
+sed -i "s/^SETUP_ACCESS_TOKEN=.*/SETUP_ACCESS_TOKEN=$setup_access_token/" .env
+unset setup_access_token
 docker compose up -d --build
 ```
 
@@ -203,14 +207,15 @@ cd frontend && npm run build                       # production build
 | `APP_NAME`     | `Task Central`                   | Display name (also editable in Settings)        |
 | `APP_ENV`      | `production`                     | Environment label                               |
 | `APP_PORT`     | `8484`                           | Host port for the web UI                        |
-| `TASKCENTRAL_VERSION` | `1.1.5`                    | Installed application release                   |
+| `TASKCENTRAL_VERSION` | `1.1.6`                    | Installed application release                   |
 | `TASKCENTRAL_RELEASE_REPOSITORY` | `lurry2020/taskcentral` | Repository used to check for releases   |
 | `DATABASE_URL` | `sqlite:////data/taskcentral.db` | SQLAlchemy connection string                    |
 | `CORS_ORIGINS` | `http://localhost:8484`          | Comma-separated allowed origins                 |
 | `LOG_LEVEL`    | `INFO`                           | Backend log level                               |
 | `LOG_MAX_BYTES` | `5242880`                       | Size at which each local log file rotates       |
 | `LOG_BACKUP_COUNT` | `5`                          | Number of older local log files retained        |
-| `SECRET_KEY`   | `change-me`                      | Reserved for future auth; set something random  |
+| `SETUP_ACCESS_TOKEN` | None; required in production | Protects incomplete first-run setup endpoints   |
+| `SESSION_COOKIE_SECURE` | `false`                  | Set `true` only when Task Central always uses HTTPS |
 | `DATA_DIR`     | `/data`                          | Data directory inside the backend container     |
 | `DEMO_MODE`    | `false`                          | Seed sample machines on first start             |
 
@@ -264,9 +269,13 @@ Task Central requires a login. It's a single user:
   and optionally Telegram and local-AI settings. Skipped integrations can be configured later.
 - The setup-selected username and password override the `AUTH_USERNAME` / `AUTH_PASSWORD`
   fallbacks. The **username is matched case-insensitively; the password is case-sensitive.**
-- Logging in issues an HMAC-signed session token (valid for `AUTH_TOKEN_TTL_HOURS`, default 7
-  days) that the browser sends on every API request. Health, login, and guarded first-run setup
-  endpoints are public; setup mutations stop working after setup completion.
+- Logging in creates a random opaque session stored in the database. The browser receives only an
+  `HttpOnly`, `SameSite=Strict` cookie, valid for `AUTH_TOKEN_TTL_HOURS` (seven days by default).
+  The credential is not exposed to frontend JavaScript or stored in browser local storage.
+- Signing out revokes the current session on the server. Changing the username or password and
+  resetting the application revoke every session immediately.
+- Health, login, and setup status are public. First-run setup mutations require the unique setup
+  access code while setup is incomplete and stop working after setup completes.
 - Sign out from the sidebar footer (or the header on mobile).
 
 Existing databases are automatically marked as already configured during upgrade. They do not
@@ -284,16 +293,22 @@ docker compose exec backend python -m app.cli setpassword 'NewPassw0rd!'
 docker compose exec backend python -m app.cli setpassword --reset
 ```
 
-The new password is stored (salted PBKDF2 hash) in the database and takes effect immediately for
-new logins - no restart needed. It overrides `AUTH_PASSWORD` until you `--reset`. The hash is
-never included in JSON data exports. Both forms preserve the username selected during setup;
-`--reset` clears only the stored password override.
+The new password is stored (salted PBKDF2 hash) in the database and takes effect immediately; no
+restart is needed. It overrides `AUTH_PASSWORD` until you `--reset`. The hash is never included in
+JSON data exports. Both forms preserve the username selected during setup, and both revoke all
+existing sessions. `--reset` clears only the stored password override.
 
 ## Security considerations
 
-- **Login is enabled** (see above), but the SPA is still a client-side app: keep the instance on
-  a private homelab network behind your firewall/VPN or an authenticating reverse proxy, and add
-  HTTPS if you ever expose it. Set a strong random **`SECRET_KEY`** - it signs the session tokens.
+- **Login is enabled** (see above), but keep the instance on a private homelab network behind your
+  firewall/VPN or an authenticating reverse proxy, and add HTTPS if you ever expose it. Set
+  `SESSION_COOKIE_SECURE=true` only after HTTPS is guaranteed end to end.
+- Production startup fails when `SETUP_ACCESS_TOKEN` is missing or weak. Release installers and
+  updaters generate it automatically; source deployments must generate it in `.env`.
+- Local AI URLs must resolve entirely to loopback, RFC 1918 private IPv4, or IPv6 ULA addresses.
+  Link-local, metadata, public, and ambiguous numeric address forms are blocked, redirects are not
+  followed, and each connection is pinned to the validated address.
+- nginx sends a restrictive Content Security Policy and standard browser hardening headers.
 - Obsidian templates render in a **sandboxed** Jinja environment - no arbitrary Python.
 - Markdown is sanitized (DOMPurify) before rendering in the UI.
 - Generated filenames are sanitized against path traversal; import size is limited (20 MB).

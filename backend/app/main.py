@@ -8,14 +8,15 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.config import get_settings
+from app.config import get_settings, validate_security_settings
 from app.database import SessionLocal, engine
 from app.logging_config import configure_logging
 from app.models import Base
 from app.routers import api_router
 from app.services.alerts import alert_loop
-from app.services.auth import verify_token
+from app.services.auth import SESSION_COOKIE_NAME, authenticate_session
 from app.services.seed import seed_all
+from app.services.setup import is_setup_complete
 
 # API paths reachable without a session. Setup endpoints enforce their own
 # single-use guard and become unavailable as soon as setup is completed.
@@ -30,6 +31,7 @@ AUTH_EXEMPT_PATHS = {
 }
 
 settings = get_settings()
+validate_security_settings(settings)
 configure_logging(settings)
 logger = logging.getLogger("taskcentral")
 
@@ -115,10 +117,28 @@ async def require_authentication(request: Request, call_next):
         or path in AUTH_EXEMPT_PATHS
     ):
         return await call_next(request)
-    header = request.headers.get("Authorization", "")
-    token = header[7:] if header.startswith("Bearer ") else None
-    if verify_token(token) is None:
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    db = SessionLocal()
+    try:
+        username = authenticate_session(db, token) if is_setup_complete(db) else None
+    finally:
+        db.close()
+    if username is None:
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    request.state.auth_username = username
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def require_same_origin_for_cookie_auth(request: Request, call_next):
+    if request.method not in {"GET", "HEAD", "OPTIONS"} and request.url.path.startswith("/api/"):
+        origin = request.headers.get("origin")
+        if origin:
+            forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip()
+            scheme = forwarded_proto or request.url.scheme
+            expected_origin = f"{scheme}://{request.headers.get('host', '')}"
+            if origin.rstrip("/") != expected_origin.rstrip("/"):
+                return JSONResponse(status_code=403, content={"detail": "Cross-origin request blocked"})
     return await call_next(request)
 
 

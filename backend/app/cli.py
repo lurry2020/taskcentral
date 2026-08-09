@@ -23,7 +23,8 @@ def _cmd_setpassword(args: argparse.Namespace) -> int:
             db.commit()
             print(
                 f"Password override for '{username}' cleared - login now uses the "
-                "AUTH_PASSWORD env/default. The username was not changed."
+                "AUTH_PASSWORD env/default. The username was not changed. Existing sessions "
+                "were signed out."
                 if cleared
                 else f"No password override was set for '{username}'; nothing to clear."
             )
@@ -44,7 +45,7 @@ def _cmd_setpassword(args: argparse.Namespace) -> int:
         db.commit()
     finally:
         db.close()
-    print(f"Password for '{username}' updated. New logins take effect immediately.")
+    print(f"Password for '{username}' updated. Existing sessions were signed out.")
     return 0
 
 

@@ -8,7 +8,7 @@ import { LoginScreen } from "@/components/LoginScreen";
 import { LoadingState } from "@/components/ui/State";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
-import { clearToken } from "@/lib/authToken";
+import { clearLegacyToken } from "@/lib/authToken";
 import { SetupPage } from "@/pages/Setup";
 import App from "./App";
 import "./index.css";
@@ -36,6 +36,7 @@ function FirstRunGate() {
   const navigate = useNavigate();
   const [setupStatus, setSetupStatus] = useState<{
     completed: boolean;
+    access_required: boolean;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +47,7 @@ function FirstRunGate() {
       const status = await api.get<{
         completed: boolean;
         required: boolean;
+        access_required: boolean;
       }>("/setup/status");
       setSetupStatus(status);
     } catch (err) {
@@ -90,11 +92,15 @@ function FirstRunGate() {
   if (!setupStatus.completed) {
     return (
       <SetupPage
+        accessRequired={setupStatus.access_required}
         onComplete={() => {
-          clearToken();
+          clearLegacyToken();
           queryClient.clear();
           navigate("/", { replace: true });
-          setSetupStatus({ completed: true });
+          setSetupStatus((current) => ({
+            completed: true,
+            access_required: current?.access_required ?? false,
+          }));
         }}
       />
     );

@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
@@ -168,6 +169,7 @@ def test_setup_api_is_single_use(client, db_session):
     assert client.get("/api/v1/setup/status").json() == {
         "completed": False,
         "required": True,
+        "access_required": False,
     }
     response = client.post("/api/v1/setup/complete", json=_payload().model_dump())
     assert response.status_code == 200
@@ -206,6 +208,37 @@ def test_model_discovery_is_available_during_setup(client, db_session, monkeypat
         "message": "Found 2 local models.",
         "models": ["llama3.2:3b", "qwen2.5:7b"],
     }
+
+
+def test_setup_integration_endpoints_require_install_access_code(
+    client, db_session, monkeypatch
+):
+    import app.routers.setup as setup_router
+    import app.services.setup as setup_service
+
+    settings = SimpleNamespace(setup_access_token="a" * 64)
+    monkeypatch.setattr(setup_router, "get_settings", lambda: settings)
+    monkeypatch.setattr(setup_service, "get_settings", lambda: settings)
+    monkeypatch.setattr(setup_router, "list_local_llm_models", lambda config: ["local-model"])
+
+    db = db_session()
+    db.get(ApplicationSetting, SETUP_COMPLETED_KEY).value = json.dumps(False)
+    db.commit()
+    db.close()
+
+    payload = {
+        "llm_provider": "ollama",
+        "llm_base_url": "http://host.docker.internal:11434",
+        "llm_api_key": "",
+        "llm_timeout_seconds": 60,
+    }
+    assert client.post("/api/v1/setup/llm-models", json=payload).status_code == 403
+    response = client.post(
+        "/api/v1/setup/llm-models",
+        json=payload,
+        headers={"X-TaskCentral-Setup-Token": "a" * 64},
+    )
+    assert response.status_code == 200
 
 
 def test_authenticated_settings_model_discovery(client, monkeypatch):

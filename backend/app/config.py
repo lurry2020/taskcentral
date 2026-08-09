@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     app_name: str = "Task Central"
     app_env: str = "development"
-    taskcentral_version: str = "1.1.5"
+    taskcentral_version: str = "1.1.6"
     taskcentral_release_repository: str = "lurry2020/taskcentral"
     changelog_path: str = ""
     database_url: str = ""
@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     log_dir: str = ""
     log_max_bytes: int = 5 * 1024 * 1024
     log_backup_count: int = 5
-    secret_key: str = "change-me"
+    setup_access_token: str = ""
+    session_cookie_secure: bool = False
     data_dir: str = ""
     demo_mode: bool = False
     max_import_bytes: int = 20 * 1024 * 1024
@@ -50,6 +51,23 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+
+def validate_security_settings(settings: Settings) -> None:
+    """Fail closed when production starts without a strong setup access code."""
+    if settings.app_env.casefold() != "production":
+        return
+    token = settings.setup_access_token.strip()
+    weak_values = {
+        "change-me",
+        "change-me-to-a-long-random-value",
+        "__generate__",
+    }
+    if len(token) < 32 or token.casefold() in weak_values:
+        raise RuntimeError(
+            "SETUP_ACCESS_TOKEN must be a unique random value of at least 32 characters "
+            "when APP_ENV=production."
+        )
 
 
 @lru_cache

@@ -37,6 +37,7 @@ router = APIRouter(prefix="/data", tags=["data"])
 
 EXPORT_VERSION = 1
 VALID_MACHINE_TYPES = {machine_type.value for machine_type in MachineType}
+INTERNAL_SETTING_KEYS = {"auth_username", "auth_password_hash", "setup_completed"}
 
 
 def _row(obj: Any, fields: list[str]) -> dict:
@@ -235,7 +236,15 @@ def import_data(
     if dry_run:
         return {"valid": True, "errors": [], "summary": summary, "imported": False}
 
-    # Full replace: wipe existing data, then insert with original IDs preserved.
+    # Full replace: wipe importable data, then insert with original IDs preserved.
+    # Authentication and setup state belong to this installation, not the import
+    # file. Preserve them along with the current authenticated session.
+    internal_settings = {
+        row.key: row.value
+        for row in db.scalars(
+            select(ApplicationSetting).where(ApplicationSetting.key.in_(INTERNAL_SETTING_KEYS))
+        )
+    }
     for model in (
         ActivityEvent, GeneratedDocument, MachineTask, MachineReminder, MachineNote, Dependency,
         Service, StorageDevice, NetworkDevice, NetworkSegment,
@@ -320,7 +329,11 @@ def import_data(
     for e in payload.get("activity_events", []):
         db.add(ActivityEvent(**{**e, "created_at": _parse_dt(e.get("created_at"))}))
     for key, value in payload.get("settings", {}).items():
+        if key in INTERNAL_SETTING_KEYS:
+            continue
         db.add(ApplicationSetting(key=str(key)[:120], value=json.dumps(value)))
+    for key, value in internal_settings.items():
+        db.add(ApplicationSetting(key=key, value=value))
 
     log_event(db, "data_imported", f"Data imported from backup file ({summary.get('machines', 0)} machines).")
     db.commit()

@@ -168,6 +168,9 @@ fi
 mkdir -p "$LOG_DIR"
 chmod 700 "$LOG_DIR"
 set_env TASKCENTRAL_VERSION "$target_version"
+if [[ -z "$(read_env SETUP_ACCESS_TOKEN)" || "$(read_env SETUP_ACCESS_TOKEN)" == "__GENERATE__" ]]; then
+  set_env SETUP_ACCESS_TOKEN "$(random_hex)"
+fi
 
 info "Updating from $current_version to $target_version…"
 if tc_compose up -d && wait_for_healthy; then

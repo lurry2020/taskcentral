@@ -8,7 +8,7 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
-import { UNAUTHORIZED_EVENT, clearToken, getToken, setToken } from "./authToken";
+import { UNAUTHORIZED_EVENT, clearLegacyToken } from "./authToken";
 
 type AuthStatus = "loading" | "authed" | "anon";
 
@@ -16,14 +16,14 @@ interface AuthContextValue {
   status: AuthStatus;
   username: string | null;
   login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   status: "loading",
   username: null,
   login: async () => {},
-  logout: () => {},
+  logout: async () => {},
 });
 
 export function useAuth(): AuthContextValue {
@@ -32,19 +32,28 @@ export function useAuth(): AuthContextValue {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
-  const [status, setStatus] = useState<AuthStatus>(() => (getToken() ? "loading" : "anon"));
+  const [status, setStatus] = useState<AuthStatus>("loading");
   const [username, setUsername] = useState<string | null>(null);
 
-  const logout = useCallback(() => {
-    clearToken();
+  const clearAuthState = useCallback(() => {
     setUsername(null);
     setStatus("anon");
     qc.clear();
   }, [qc]);
 
-  // Verify any stored token on load so a stale one bounces straight to login.
+  const logout = useCallback(async () => {
+    try {
+      await api.post<void>("/auth/logout");
+    } catch {
+      // Clear the local UI even when the server is unreachable.
+    } finally {
+      clearAuthState();
+    }
+  }, [clearAuthState]);
+
+  // Verify the HttpOnly cookie on load. Legacy localStorage tokens are discarded.
   useEffect(() => {
-    if (!getToken()) return;
+    clearLegacyToken();
     let active = true;
     api
       .get<{ username: string }>("/auth/me")
@@ -55,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         if (!active) return;
-        clearToken();
+        clearLegacyToken();
         setStatus("anon");
       });
     return () => {
@@ -65,18 +74,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Backend rejected the session mid-use → drop to the login screen.
   useEffect(() => {
-    const onUnauthorized = () => logout();
+    const onUnauthorized = () => clearAuthState();
     window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
-  }, [logout]);
+  }, [clearAuthState]);
 
   const login = useCallback(
     async (user: string, password: string) => {
-      const res = await api.post<{ token: string; username: string }>("/auth/login", {
+      const res = await api.post<{ username: string }>("/auth/login", {
         username: user,
         password,
       });
-      setToken(res.token);
       qc.clear();
       setUsername(res.username);
       setStatus("authed");

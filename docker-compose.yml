@@ -6,7 +6,7 @@ services:
     environment:
       APP_NAME: ${APP_NAME:-Task Central}
       APP_ENV: ${APP_ENV:-production}
-      TASKCENTRAL_VERSION: ${TASKCENTRAL_VERSION:-1.1.5}
+      TASKCENTRAL_VERSION: ${TASKCENTRAL_VERSION:-1.1.6}
       TASKCENTRAL_RELEASE_REPOSITORY: ${TASKCENTRAL_RELEASE_REPOSITORY:-lurry2020/taskcentral}
       CHANGELOG_PATH: /app/CHANGELOG.md
       DATABASE_URL: ${DATABASE_URL:-sqlite:////data/taskcentral.db}
@@ -16,7 +16,8 @@ services:
       LOG_DIR: /logs
       LOG_MAX_BYTES: ${LOG_MAX_BYTES:-5242880}
       LOG_BACKUP_COUNT: ${LOG_BACKUP_COUNT:-5}
-      SECRET_KEY: ${SECRET_KEY:-change-me}
+      SETUP_ACCESS_TOKEN: ${SETUP_ACCESS_TOKEN:?Set SETUP_ACCESS_TOKEN in .env}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       DEMO_MODE: ${DEMO_MODE:-false}
       AUTH_USERNAME: ${AUTH_USERNAME:-admin}
       AUTH_PASSWORD: ${AUTH_PASSWORD:-change-me-on-first-run}
@@ -45,7 +46,7 @@ services:
     build:
       context: ./frontend
       args:
-        TASKCENTRAL_VERSION: ${TASKCENTRAL_VERSION:-1.1.5}
+        TASKCENTRAL_VERSION: ${TASKCENTRAL_VERSION:-1.1.6}
     container_name: ${COMPOSE_PROJECT_NAME:-taskcentral}-frontend
     restart: unless-stopped
     depends_on:

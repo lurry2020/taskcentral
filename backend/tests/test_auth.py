@@ -3,13 +3,14 @@ from types import SimpleNamespace
 
 from app.config import get_settings
 from app.main import app
+from app.services.auth import SESSION_COOKIE_NAME
 
 DEFAULT_USERNAME = get_settings().auth_username
 DEFAULT_PASSWORD = get_settings().auth_password
 
 
 def test_protected_routes_require_auth():
-    # A client with no Authorization header is rejected on protected routes.
+    # A client with no session cookie is rejected on protected routes.
     with TestClient(app) as anon:
         assert anon.get("/api/v1/machines").status_code == 401
         assert anon.get("/api/v1/settings").status_code == 401
@@ -24,10 +25,13 @@ def test_login_success_and_me(client):
         json={"username": DEFAULT_USERNAME.upper(), "password": DEFAULT_PASSWORD},
     )
     assert resp.status_code == 200
-    token = resp.json()["token"]
     assert resp.json()["username"] == DEFAULT_USERNAME
+    assert "token" not in resp.json()
+    set_cookie = resp.headers["set-cookie"]
+    assert "HttpOnly" in set_cookie
+    assert "SameSite=strict" in set_cookie
 
-    me = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    me = client.get("/api/v1/auth/me")
     assert me.status_code == 200
     assert me.json()["username"] == DEFAULT_USERNAME
 
@@ -49,8 +53,66 @@ def test_login_password_is_case_sensitive(client):
 
 
 def test_bad_token_rejected(client):
-    resp = client.get("/api/v1/machines", headers={"Authorization": "Bearer not.a.validtoken"})
+    client.cookies.set(
+        SESSION_COOKIE_NAME,
+        "not-a-valid-session",
+        domain="testserver.local",
+        path="/api",
+    )
+    resp = client.get("/api/v1/machines")
     assert resp.status_code == 401
+
+
+def test_logout_revokes_server_side_session(client):
+    assert client.get("/api/v1/machines").status_code == 200
+    assert client.post("/api/v1/auth/logout").status_code == 204
+    assert client.get("/api/v1/machines").status_code == 401
+
+
+def test_password_change_revokes_existing_sessions(client, db_session):
+    from app.services.auth import set_password
+
+    assert client.get("/api/v1/machines").status_code == 200
+    db = db_session()
+    set_password(db, "replacement-password")
+    db.commit()
+    db.close()
+    assert client.get("/api/v1/machines").status_code == 401
+
+
+def test_application_reset_invalidates_existing_session(client, db_session):
+    from app.services.reset import reset_application
+
+    assert client.get("/api/v1/machines").status_code == 200
+    db = db_session()
+    reset_application(db)
+    db.close()
+    assert client.get("/api/v1/machines").status_code == 401
+    assert (
+        client.post(
+            "/api/v1/auth/login",
+            json={"username": DEFAULT_USERNAME, "password": DEFAULT_PASSWORD},
+        ).status_code
+        == 409
+    )
+
+
+def test_cross_origin_cookie_request_is_rejected(client):
+    response = client.post(
+        "/api/v1/settings/test-telegram",
+        json={},
+        headers={"Origin": "https://attacker.example"},
+    )
+    assert response.status_code == 403
+
+
+def test_same_origin_cookie_request_is_allowed(client):
+    response = client.post(
+        "/api/v1/settings/test-telegram",
+        json={},
+        headers={"Origin": "http://testserver"},
+    )
+    assert response.status_code != 403
 
 
 def test_cli_setpassword_changes_login(db_session):

@@ -22,3 +22,9 @@ opening any public issue.
 Task Central is a single-user homelab application. Keep it on a trusted private network or behind
 an access-controlled HTTPS reverse proxy. The application does not provide built-in TLS, multiple
 users, roles, account lockout, or rate limiting.
+
+Release installs generate a setup access code and use revocable, database-backed sessions in an
+HttpOnly SameSite cookie. Password/username changes, logout, and factory reset revoke the affected
+sessions. Enable `SESSION_COOKIE_SECURE=true` only when the application is always accessed through
+HTTPS. Local-AI connections accept only validated loopback/private destinations and block public,
+link-local, metadata, and ambiguous numeric addresses.

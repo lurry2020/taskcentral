@@ -161,9 +161,21 @@ shown only while the internal `setup_completed` flag is false. Existing installa
 recognized during startup and marked complete automatically, so upgrading does not replace the
 login page with setup or overwrite existing preferences.
 
+The installer prints a unique setup access code. Enter that code on the Account screen. It protects
+setup completion, Telegram testing, local-AI testing, and model discovery until setup is finished.
+If the code is no longer visible, an administrator can read it locally from the installation
+directory with:
+
+```bash
+grep '^SETUP_ACCESS_TOKEN=' .env | cut -d= -f2-
+```
+
+Treat this code as a secret. It is not the login password and is not saved by the browser.
+
 The wizard has five screens:
 
 1. **Account**
+   - Enter the setup access code printed by `install.sh`.
    - Choose the login username. Leading and trailing whitespace is removed.
    - Enter and confirm the single-user login password.
    - The minimum length is 6 characters.
@@ -218,11 +230,13 @@ Task Central has one application user.
   `AUTH_USERNAME`.
 - Usernames are compared case-insensitively.
 - Passwords are case-sensitive.
-- A successful login returns an HMAC-signed bearer token.
-- The browser stores the token in local storage under `taskcentral-token`.
+- A successful login creates a random opaque session whose hash is stored in the database.
+- The browser receives the session in an `HttpOnly`, `SameSite=Strict` cookie scoped to `/api`.
+- Frontend JavaScript cannot read the session credential, and it is not stored in local storage.
 - The default session lifetime is seven days.
 - An expired or invalid token returns the user to the login screen.
-- Signing out removes the stored token and clears cached application data in the browser.
+- Signing out revokes the current database session and clears the cookie.
+- Changing the username or password and resetting the application revoke all sessions immediately.
 
 Every `/api/v1/*` endpoint requires authentication except:
 
@@ -234,8 +248,8 @@ Every `/api/v1/*` endpoint requires authentication except:
 - `POST /api/v1/setup/test-telegram`
 - `POST /api/v1/setup/test-llm`
 
-The four setup mutation/test endpoints are usable only before setup is completed. Login is
-blocked until setup is complete.
+The four setup mutation/test endpoints require the installation's setup access code and are usable
+only before setup is completed. Login is blocked until setup is complete.
 
 ### Changing the password
 
@@ -268,8 +282,8 @@ docker compose exec backend python -m app.cli setpassword --reset
 The `--reset` option clears only the database password override. It does not remove or replace the
 setup-selected username; that username remains paired with the `AUTH_PASSWORD` fallback.
 
-Changing the password does not revoke already-issued session tokens. Change `SECRET_KEY` and
-restart the backend if all existing tokens must be invalidated.
+Changing or resetting the password immediately revokes all existing sessions. Every browser must
+sign in again with the effective password.
 
 ### Forgot password from the login page
 
@@ -293,8 +307,8 @@ the reset.
 
 The source distribution contains development-style fallback credentials, but a new installation
 cannot log in until the setup wizard creates a database-backed username and password. Those
-values override the authentication fallbacks. Treat any fallback credentials as public knowledge
-and replace the default `SECRET_KEY` with a long random value.
+values override the authentication fallbacks. Treat any fallback credentials as public knowledge.
+Production also requires a unique random `SETUP_ACCESS_TOKEN`; the release installer creates it.
 
 See [Known current-version caveats](#known-current-version-caveats) before relying on
 `AUTH_USERNAME` or `AUTH_PASSWORD` values placed only in `.env`.
@@ -1284,6 +1298,13 @@ replace an already-seeded database setting.
 
 Save Settings after a successful test. Testing alone does not enable the chat.
 
+Local AI connections are intentionally limited to loopback, RFC 1918 private IPv4, and IPv6 ULA
+destinations. Every DNS result must be allowed. Public IPs, link-local ranges such as
+`169.254.0.0/16` and `fe80::/10`, cloud metadata addresses, and ambiguous integer, hexadecimal, or
+nonstandard numeric IP forms are rejected. Task Central resolves the hostname again for each
+request, pins the connection to the validated address, and does not follow redirects. Detailed
+upstream failures go to `logs/taskcentral.log`; the web response does not echo the upstream body.
+
 ### Data Management
 
 - Export all data as JSON
@@ -1484,12 +1505,13 @@ Node.js, npm, or a local compiler.
 ```
 
 5. Choose the web port, or press Enter for `8484`.
-6. Open the URL printed by the installer and complete the first-run setup wizard.
+6. Copy the setup access code printed by the installer, open the printed URL, and enter the code in
+   the first-run setup wizard.
 
 The installer:
 
 - Verifies access to Docker and Docker Compose v2
-- Generates a unique `SECRET_KEY` and random fallback password
+- Generates a unique setup access code and random fallback password
 - Creates private `data/` and `backups/` directories
 - Pulls pinned, versioned backend and frontend images
 - Starts both services and waits until both health checks pass
@@ -1504,6 +1526,9 @@ Clone or copy the source tree, then:
 
 ```bash
 cp .env.example .env
+setup_access_token=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
+sed -i "s/^SETUP_ACCESS_TOKEN=.*/SETUP_ACCESS_TOKEN=$setup_access_token/" .env
+unset setup_access_token
 docker compose up -d --build
 ```
 
@@ -1582,7 +1607,8 @@ A healthy response is:
 | `LOG_LEVEL` | `INFO` | Backend logging level |
 | `LOG_MAX_BYTES` | `5242880` | Size at which each persistent local log rotates |
 | `LOG_BACKUP_COUNT` | `5` | Number of older numbered log files retained |
-| `SECRET_KEY` | `change-me` | HMAC key used to sign login session tokens |
+| `SETUP_ACCESS_TOKEN` | Empty in code; required in production | Secret required by incomplete setup mutation and integration-test endpoints |
+| `SESSION_COOKIE_SECURE` | `false` | Mark the session cookie Secure; enable only when every browser connection uses HTTPS |
 | `DATA_DIR` | Repository `data` locally, `/data` in the container | Data directory |
 | `DEMO_MODE` | `false` | Seed sample machines on startup |
 | `MAX_IMPORT_BYTES` | `20971520` | Backend request/import size threshold |
@@ -1590,8 +1616,9 @@ A healthy response is:
 | `AUTH_PASSWORD` | Development placeholder; random in release installs | Legacy/CLI fallback password |
 | `AUTH_TOKEN_TTL_HOURS` | `168` | Login token lifetime in hours |
 
-Release installers generate `.env` with mode `0600`. Do not share it; it contains the session
-signing key and fallback password.
+Release installers generate `.env` with mode `0600`. Do not share it; it contains the setup access
+code and fallback password. Updaters add a random setup access code to older installations without
+changing their application data or login credentials.
 
 ### Reverse proxy
 
@@ -1820,30 +1847,29 @@ The OpenAPI document is at `/api/openapi.json`.
 
 ### Authenticating
 
-Login:
+Login and save the returned cookie in a temporary cookie jar:
 
 ```bash
-curl -sS \
+curl -sS -c taskcentral-cookies.txt \
   -H 'Content-Type: application/json' \
   -d '{"username":"YOUR_USERNAME","password":"YOUR_PASSWORD"}' \
   http://localhost:8484/api/v1/auth/login
 ```
 
-The response contains `token` and `username`. Supply the token on protected calls:
+The response contains the username only. Supply the saved HttpOnly cookie on protected calls:
 
 ```bash
-curl -sS \
-  -H 'Authorization: Bearer YOUR_TOKEN' \
+curl -sS -b taskcentral-cookies.txt \
   http://localhost:8484/api/v1/machines
 ```
 
-Do not paste real tokens into tickets, notes, prompts, or command history.
+Delete the temporary cookie jar when finished and never attach it to tickets, notes, or prompts.
 
 ### API groups
 
 | Group | Purpose |
 |---|---|
-| `/setup` | Public first-run status, one-time completion, and pre-save integration tests |
+| `/setup` | Public first-run status plus setup-code-protected completion and pre-save integration tests |
 | `/auth` | Login and current-user validation |
 | `/health` | Database-backed health check |
 | `/chat` | Authenticated local-LLM chat completion |
@@ -1877,7 +1903,8 @@ Recommended controls:
 
 - Keep the application on a private LAN, VPN, or access-controlled reverse proxy.
 - Use HTTPS whenever traffic can cross an untrusted network.
-- Set a long random `SECRET_KEY`; changing it invalidates all existing tokens.
+- Protect the generated `SETUP_ACCESS_TOKEN`; it can authorize setup only while setup is incomplete.
+- Set `SESSION_COOKIE_SECURE=true` when Task Central is available exclusively through HTTPS.
 - Change the built-in password immediately with the CLI.
 - Protect `.env`, database backups, and JSON exports.
 - Do not commit `.env` or the `data` directory.
@@ -1894,7 +1921,12 @@ Recommended controls:
 
 Application protections include:
 
-- HMAC-signed, expiring bearer tokens
+- Random, expiring, server-side sessions delivered through HttpOnly SameSite cookies
+- Immediate session revocation on logout, username/password change, and factory reset
+- Same-origin validation for cookie-authenticated state-changing API requests
+- A generated setup access code for incomplete setup mutation and integration endpoints
+- Strict private-address validation and DNS pinning for local-AI requests
+- Content Security Policy, anti-framing, MIME-sniffing, and referrer security headers
 - Salted PBKDF2 database password overrides
 - Sandboxed Jinja templates
 - Sanitized Markdown rendering
@@ -1903,8 +1935,8 @@ Application protections include:
 - Pydantic validation for API input
 - SQLite foreign keys and cascading child deletion
 
-The application does not provide multiple users, roles, permissions, token revocation lists,
-rate limiting, account lockout, or built-in TLS.
+The application does not provide multiple users, roles, permissions, rate limiting, account
+lockout, or built-in TLS.
 
 ## Logs and diagnostics
 
@@ -1951,7 +1983,7 @@ logs/
   browser access requests are intentionally omitted.
 - The active files rotate at 5 MiB by default and keep five older numbered copies. Configure
   `LOG_MAX_BYTES` and `LOG_BACKUP_COUNT` in `.env`, then recreate the containers to change this.
-- Task Central does not intentionally record passwords, API keys, bearer tokens, chat prompts, or
+- Task Central does not intentionally record passwords, API keys, session cookies, chat prompts, or
   model response bodies. Local-AI response-shape errors record only structural field names.
 
 ### Reading the logs
@@ -2084,7 +2116,7 @@ The health endpoint performs `SELECT 1`; a database problem causes it to fail.
 
 5. Confirm the backend is using the intended database volume.
 6. If relying only on `.env` credentials, read the Compose caveat below.
-7. Clear the site's local storage or sign out if an old token is behaving unexpectedly.
+7. Sign out and sign in again if the current session is behaving unexpectedly.
 
 ### Setup appears unexpectedly
 

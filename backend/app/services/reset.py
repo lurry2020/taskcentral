@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models import (
     ActivityEvent,
     ApplicationSetting,
+    AuthSession,
     Dependency,
     GeneratedDocument,
     Machine,
@@ -35,6 +36,7 @@ def reset_application(db: Session) -> None:
     """
     try:
         for model in (
+            AuthSession,
             ActivityEvent,
             GeneratedDocument,
             MachineTask,

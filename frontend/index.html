@@ -5,15 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark light" />
     <title>Task Central</title>
-    <script>
-      // Apply the saved theme before first paint to avoid a flash.
-      try {
-        var t = localStorage.getItem("taskcentral-theme");
-        document.documentElement.dataset.theme = t === "light" ? "light" : "dark";
-      } catch (e) {
-        document.documentElement.dataset.theme = "dark";
-      }
-    </script>
+    <script src="/theme-init.js"></script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>
   <body>

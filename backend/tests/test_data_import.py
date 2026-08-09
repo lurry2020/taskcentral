@@ -5,6 +5,8 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import build_engine
 from app.models import (
+    ApplicationSetting,
+    AuthSession,
     Base,
     Machine,
     NetworkDevice,
@@ -12,6 +14,7 @@ from app.models import (
     StorageDevice,
 )
 from app.routers.data import build_export, import_data
+from app.services.auth import create_session, set_login_username, set_password
 from app.services.seed import seed_all
 
 
@@ -110,6 +113,33 @@ def test_invalid_import_returns_a_useful_422_detail(tmp_path):
         assert body["detail"] == (
             "Import validation failed: Machine record invalid: 'Unknown type'"
         )
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def test_import_preserves_installation_credentials_and_sessions(tmp_path):
+    engine, session_factory = _database(tmp_path)
+    db = session_factory()
+    try:
+        seed_all(db)
+        set_login_username(db, "local-owner")
+        set_password(db, "local-password")
+        token, _ = create_session(db, "local-owner")
+        db.commit()
+        exported = build_export(db)
+        exported["settings"]["auth_username"] = "imported-owner"
+        exported["settings"]["auth_password_hash"] = "not-a-real-hash"
+        exported["settings"]["setup_completed"] = False
+
+        result = import_data(exported, dry_run=False, db=db)
+
+        assert result["imported"] is True
+        assert db.get(ApplicationSetting, "auth_username").value == '"local-owner"'
+        assert db.get(ApplicationSetting, "auth_password_hash").value != '"not-a-real-hash"'
+        assert db.get(ApplicationSetting, "setup_completed") is not None
+        assert db.scalar(select(func.count()).select_from(AuthSession)) == 1
+        assert token
     finally:
         db.close()
         engine.dispose()

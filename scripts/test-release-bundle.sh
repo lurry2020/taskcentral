@@ -180,7 +180,7 @@ APP_PORT=8588 "$INSTALL_DIR/install.sh"
 [[ "$(stat -c '%a' "$INSTALL_DIR/.env")" == "600" ]]
 [[ "$(awk -F= '$1 == "APP_PORT" {print $2}' "$INSTALL_DIR/.env")" == "8588" ]]
 [[ "$(awk -F= '$1 == "TASKCENTRAL_VERSION" {print $2}' "$INSTALL_DIR/.env")" == "1.0.0" ]]
-[[ "$(awk -F= '$1 == "SECRET_KEY" {print length($2)}' "$INSTALL_DIR/.env")" == "64" ]]
+[[ "$(awk -F= '$1 == "SETUP_ACCESS_TOKEN" {print length($2)}' "$INSTALL_DIR/.env")" == "64" ]]
 [[ "$(awk -F= '$1 == "AUTH_PASSWORD" {print length($2)}' "$INSTALL_DIR/.env")" == "64" ]]
 [[ -d "$INSTALL_DIR/data" && -d "$INSTALL_DIR/backups" && -d "$INSTALL_DIR/logs" ]]
 
@@ -206,11 +206,13 @@ rm -f "$LEGACY_DIR/taskcentral-update.sh"
 export FAKE_INSTALL_DIR="$LEGACY_DIR"
 printf 'healthy\n' >"$HEALTH_FILE"
 APP_PORT=8589 "$LEGACY_DIR/install.sh"
+sed -i '/^SETUP_ACCESS_TOKEN=/d' "$LEGACY_DIR/.env"
 (
   cd "$LEGACY_DIR"
   bash "$ROOT_DIR/release/taskcentral-update.sh" "1.1.0"
 )
 [[ "$(awk -F= '$1 == "TASKCENTRAL_VERSION" {print $2}' "$LEGACY_DIR/.env")" == "1.1.0" ]]
+[[ "$(awk -F= '$1 == "SETUP_ACCESS_TOKEN" {print length($2)}' "$LEGACY_DIR/.env")" == "64" ]]
 grep -q '^Bundle marker: 1.1.0$' "$LEGACY_DIR/README.md"
 
 export FAKE_INSTALL_DIR="$INSTALL_DIR"

@@ -1,6 +1,7 @@
 """First-run setup state and atomic application of the setup wizard."""
 
 import json
+import hmac
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -81,6 +82,14 @@ def initialize_setup_state(db: Session) -> bool:
 def require_setup_incomplete(db: Session) -> None:
     if is_setup_complete(db):
         raise HTTPException(status_code=409, detail="Initial setup has already been completed.")
+
+
+def require_setup_access(db: Session, provided_token: str) -> None:
+    """Require the install-generated access code while first-run setup is open."""
+    require_setup_incomplete(db)
+    expected = get_settings().setup_access_token
+    if expected and not hmac.compare_digest(provided_token, expected):
+        raise HTTPException(status_code=403, detail="Invalid setup access code.")
 
 
 def complete_setup(db: Session, payload) -> None:

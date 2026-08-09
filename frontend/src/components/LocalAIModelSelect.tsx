@@ -23,6 +23,7 @@ interface LocalAIModelSelectProps {
   onChange: (model: string) => void;
   className?: string;
   required?: boolean;
+  setupAccessToken?: string;
 }
 
 function hasUsableUrl(value: string): boolean {
@@ -45,6 +46,7 @@ export function LocalAIModelSelect({
   onChange,
   className,
   required,
+  setupAccessToken,
 }: LocalAIModelSelectProps) {
   const [models, setModels] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -67,12 +69,18 @@ export function LocalAIModelSelect({
     setFailed(false);
     setMessage(null);
     try {
-      const result = await api.post<ModelListResult>(endpoint, {
-        llm_provider: provider,
-        llm_base_url: baseUrl.trim(),
-        llm_api_key: apiKey.trim(),
-        llm_timeout_seconds: timeoutSeconds,
-      });
+      const result = await api.post<ModelListResult>(
+        endpoint,
+        {
+          llm_provider: provider,
+          llm_base_url: baseUrl.trim(),
+          llm_api_key: apiKey.trim(),
+          llm_timeout_seconds: timeoutSeconds,
+        },
+        setupAccessToken
+          ? { "X-TaskCentral-Setup-Token": setupAccessToken }
+          : undefined,
+      );
       if (currentRequest !== requestId.current) return;
       setModels(result.models);
       setMessage(result.message);
@@ -88,7 +96,7 @@ export function LocalAIModelSelect({
     } finally {
       if (currentRequest === requestId.current) setLoading(false);
     }
-  }, [apiKey, baseUrl, canLoad, endpoint, provider, timeoutSeconds]);
+  }, [apiKey, baseUrl, canLoad, endpoint, provider, setupAccessToken, timeoutSeconds]);
 
   useEffect(() => {
     requestId.current += 1;
