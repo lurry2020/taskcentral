@@ -150,6 +150,34 @@ responses are not cached, so a normal reload is sufficient; a hard refresh is no
 
 See the README inside the release bundle for full operational instructions.
 
+
+## Known issue: updating from a release before 1.1.6
+
+> [!WARNING]
+> Running `./update.sh` from any release older than 1.1.6 can stop partway with this message:
+>
+> ```
+> unexpected EOF while looking for matching `"'
+> ```
+
+The old updater rewrites itself while it is still running, so the shell loses its place in the middle of the file it is reading. It looks worse than it is. Nothing touches your database, your `.env`, or your backups, and the containers keep running the version you already had.
+
+**Run the update again.** The second pass usually completes, because the newer script is already on disk:
+
+```bash
+./update.sh
+```
+
+**If it fails again**, fetch the current updater and run that instead:
+
+```bash
+curl -fsSL https://github.com/lurry2020/taskcentral/releases/latest/download/taskcentral-update.sh | bash
+```
+
+Once you are on 1.1.6 or later the updater no longer overwrites itself mid run, so this stops happening for good.
+
+
+
 ## Source quick start
 
 Developers and source-based deployments can still build locally:
