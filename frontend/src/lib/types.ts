@@ -398,6 +398,23 @@ export interface AppSettings {
   llm_include_manual: boolean;
 }
 
+export type IntegrationTokenScope = "inventory:read";
+
+export interface IntegrationToken {
+  id: number;
+  name: string;
+  token_prefix: string;
+  scopes: IntegrationTokenScope[];
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  active: boolean;
+}
+
+export interface IntegrationTokenCreated extends IntegrationToken {
+  token: string;
+}
+
 export interface MetaOptions {
   task_categories: string[];
   dependency_types: string[];

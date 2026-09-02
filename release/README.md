@@ -58,6 +58,23 @@ Use the **Changelog** button at the bottom of the sidebar to reopen them later.
 Tabs that were open during the update display **Reload Task Central** after detecting the new
 running version. HTML entry responses are not cached, so a normal reload is sufficient.
 
+## Integration tokens
+
+Read-only integration tokens can be created and revoked under **Settings → Integration API**.
+They can also be managed from this installation directory:
+
+```bash
+docker compose --env-file .env -f compose.yml exec backend \
+  python -m app.cli integration-token create --name automation --scope inventory:read
+docker compose --env-file .env -f compose.yml exec backend \
+  python -m app.cli integration-token list
+docker compose --env-file .env -f compose.yml exec backend \
+  python -m app.cli integration-token revoke TOKEN_ID_OR_PREFIX
+```
+
+The complete token is printed once at creation. Store it securely. If it is lost or exposed,
+revoke it and create a replacement. Full endpoint documentation is in `MANUAL.md` and `/api/docs`.
+
 ## Back up and restore
 
 Create a consistent online SQLite backup:

@@ -9,6 +9,8 @@ from app.routers import (
     dependencies,
     documents,
     health,
+    integrations,
+    integration_tokens,
     machines,
     notes,
     network,
@@ -26,6 +28,7 @@ from app.routers import (
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health.router)
+api_router.include_router(integrations.router)
 api_router.include_router(auth.router)
 api_router.include_router(setup.router)
 api_router.include_router(chat.router)
@@ -45,4 +48,5 @@ api_router.include_router(task_templates.router)
 api_router.include_router(obsidian_templates.router)
 api_router.include_router(documents.router)
 api_router.include_router(settings_router.router)
+api_router.include_router(integration_tokens.router)
 api_router.include_router(data.router)

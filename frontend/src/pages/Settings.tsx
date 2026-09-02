@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/Button";
 import { Checkbox, FormField, Input, Select } from "@/components/ui/Field";
 import { TimezoneSelect } from "@/components/ui/TimezoneSelect";
 import { LocalAIModelSelect } from "@/components/LocalAIModelSelect";
+import { IntegrationTokensCard } from "@/components/settings/IntegrationTokensCard";
 import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
 import { ErrorState, LoadingState } from "@/components/ui/State";
 import { useToast } from "@/components/ui/Toast";
@@ -653,6 +654,8 @@ export function SettingsPage() {
             </div>
           </CardBody>
         </Card>
+
+        <IntegrationTokensCard />
 
         <div className="flex items-center gap-3">
           <Button

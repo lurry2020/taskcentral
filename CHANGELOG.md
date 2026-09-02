@@ -7,6 +7,13 @@ displays the running version and every older release in newest-first order.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-02
+
+### Added
+
+- Added a secure, read-only integration API with revocable access tokens, allowing automation tools
+  to retrieve machine, service, and dependency data from Task Central.
+
 ## [1.1.6]
 
 ### Security

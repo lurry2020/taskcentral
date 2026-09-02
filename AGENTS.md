@@ -96,8 +96,9 @@ named `CHECK` constraints (widened over time via batch migrations).
   (`last_performed_at`, `next_due_at`, `enabled`, `last_notified_due_at`).
 - **template.py** - `ObsidianTemplate` (one per machine_type, Jinja content).
 - **misc.py** - `GeneratedDocument` (versioned doc snapshots), `ActivityEvent` (audit log),
-  `ApplicationSetting` (**key/value store; values are JSON-encoded strings**), and `AuthSession`
-  (hashed opaque browser sessions with expiry). Settings that aren't in `SettingsOut` (e.g.
+  `ApplicationSetting` (**key/value store; values are JSON-encoded strings**), `AuthSession`
+  (hashed opaque browser sessions with expiry), and `IntegrationToken` (hashed, scoped, revocable
+  credentials for the read-only integration router). Settings that aren't in `SettingsOut` (e.g.
   `auth_password_hash`, `last_alert_sent_at`) are stored here but not exposed.
 
 ## Core domain concepts & seams
@@ -156,6 +157,12 @@ named `CHECK` constraints (widened over time via batch migrations).
   enforce same origin. Frontend: `lib/auth.tsx` (`AuthProvider`/`useAuth`), `lib/api.ts` uses
   same-origin cookies and fires a logout event on 401, `components/LoginScreen.tsx`, gate in
   `main.tsx`. `authToken.ts` removes legacy local-storage credentials.
+- **Integration API.** `services/integration_tokens.py` creates `tcint_<prefix>_<secret>` credentials,
+  stores only SHA-256 hashes, performs timing-safe verification, throttles last-used writes, and
+  handles revocation. `routers/integrations.py` is explicitly exempt from browser-session middleware
+  and exclusively requires `inventory:read` bearer tokens. Normal APIs never accept these tokens.
+  Browser-session-protected management lives at `/settings/integration-tokens`; the Settings card is
+  `components/settings/IntegrationTokensCard.tsx`; CLI management is under `integration-token`.
 - **First-run setup.** `services/setup.py` owns the internal `setup_completed` flag. `seed_all`
   initializes it **before** default settings: false for an empty database and true for an existing
   installation, so upgrades never reopen setup. Setup status is public, while incomplete setup
@@ -171,13 +178,13 @@ named `CHECK` constraints (widened over time via batch migrations).
 
 ## API surface (`/api/v1`, see `routers/__init__.py`)
 `setup` (status/complete/integration tests/model discovery), `auth` (login/me), `health`,
-`changelog` (current/seen), `dashboard`,
+`changelog` (current/seen), `dashboard`, `integrations` (read-only token-authenticated context),
 `machines` (CRUD + `/duplicate` `/archive` `/unarchive` `/connectivity`
 `/validate` `/hosts` `/tags` `/activity`), `tasks`, `reminders`, `services`, `storage`,
 `network` (devices + segments), `dependencies`, `notes`, `task_templates`, `reminder_templates`,
 `obsidian_templates` (+ `/preview` `/variables` `/{id}/reset`), `documents`
 (`/generate` `/{id}` `/{id}/download`), `settings` (+ `/test-telegram`
-`/restore-default-templates`), `data` (`/export` `/import` `/backup` `/clear-sample-data`
+`/restore-default-templates` + `/integration-tokens` management), `data` (`/export` `/import` `/backup` `/clear-sample-data`
 `/reset-application`).
 Machine-scoped resources are nested under `/machines/{id}/…`. Helpers in `routers/helpers.py`
 (`get_machine_or_404`, `resolve_tags`, `duplicate_warnings`).
@@ -203,7 +210,8 @@ Machine-scoped resources are nested under `/machines/{id}/…`. Helpers in `rout
 
 ## Migrations & extending
 - Migrations in `backend/alembic/versions/` (head chain: initial → HOST → hypervisor+storage →
-  NETWORK → reminders → document regeneration state → server-side sessions). **SQLite `CHECK`-constraint changes use `op.batch_alter_table`**
+  NETWORK → reminders → document regeneration state → server-side sessions → integration tokens).
+  **SQLite `CHECK`-constraint changes use `op.batch_alter_table`**
   (drop+recreate the named constraint). Always additive; test on a copy of `data/taskcentral.db`
   first. Env resolves the URL from app config (`alembic/env.py`).
 - **Adding a machine type / field** touches many spots in lockstep: enum in
@@ -221,7 +229,8 @@ Machine-scoped resources are nested under `/machines/{id}/…`. Helpers in `rout
 - Backend: pytest in `backend/tests/` (conftest builds a tmp-file SQLite per test, seeds defaults,
   and the shared `client` fixture is **pre-authenticated** since the auth middleware guards all
   routes). ~56 tests cover machines, tasks, reminders, alerts, templates/docs, data, auth, misc.
-- Frontend: vitest for `lib/utils` and `components/machine/schema` (`npx vitest run`).
+- Frontend: vitest, Testing Library, and jsdom for utilities, schemas, and token-management UI
+  (`npx vitest run`).
 
 ## Gotchas
 - Backend timestamps are stored UTC but serialized **without a `Z`** - the frontend re-adds it
@@ -237,6 +246,8 @@ Machine-scoped resources are nested under `/machines/{id}/…`. Helpers in `rout
   database; verify the live route through OpenAPI/route inspection without posting to it.
 - JSON exports also omit the internal `setup_completed` flag. A missing flag on a database that
   already has settings, machines, or templates is treated as a completed legacy installation.
+- Integration-token plaintext is returned only at creation. Never add integration-token records to
+  JSON export/import, logs, URLs, or browser storage. Raw database backups contain token hashes.
 - `ApplicationSetting.value` is **JSON-encoded** - always `json.loads/dumps` when touching it.
 - Release scripts are intentionally relocatable and resolve paths from their own directory. Never
   replace them with hard-coded `/taskcentral` paths.

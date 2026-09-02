@@ -28,3 +28,8 @@ HttpOnly SameSite cookie. Password/username changes, logout, and factory reset r
 sessions. Enable `SESSION_COOKIE_SECURE=true` only when the application is always accessed through
 HTTPS. Local-AI connections accept only validated loopback/private destinations and block public,
 link-local, metadata, and ambiguous numeric addresses.
+
+Read-only integrations use dedicated revocable tokens rather than browser sessions. Only a token
+hash is stored, and the plaintext is displayed once at creation. Give each consumer its own token,
+send it only over trusted networks or HTTPS, rotate it if exposed, and revoke tokens that are no
+longer used. Integration tokens cannot authenticate normal application or write endpoints.

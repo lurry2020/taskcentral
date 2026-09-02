@@ -9,6 +9,7 @@ from app.models import (
     AuthSession,
     Dependency,
     GeneratedDocument,
+    IntegrationToken,
     Machine,
     MachineNote,
     MachineReminder,
@@ -37,6 +38,7 @@ def reset_application(db: Session) -> None:
     try:
         for model in (
             AuthSession,
+            IntegrationToken,
             ActivityEvent,
             GeneratedDocument,
             MachineTask,

@@ -41,7 +41,8 @@ Markdown document.
 - [Upgrading](#upgrading)
 - [Version and update checking](#version-and-update-checking)
 - [Changelog and What's New](#changelog-and-whats-new)
-- [API access](#api-access)
+- [Read-only Integration API](#read-only-integration-api)
+- [Browser-session API access](#browser-session-api-access)
 - [Security guidance](#security-guidance)
 - [Logs and diagnostics](#logs-and-diagnostics)
 - [Troubleshooting](#troubleshooting)
@@ -1305,6 +1306,23 @@ nonstandard numeric IP forms are rejected. Task Central resolves the hostname ag
 request, pins the connection to the validated address, and does not follow redirects. Detailed
 upstream failures go to `logs/taskcentral.log`; the web response does not echo the upstream body.
 
+### Integration API
+
+This section manages dedicated credentials for the read-only Integration API. It lists each token's
+name, displayed prefix, scopes, creation time, last-used time, and Active or Revoked state.
+
+To create a token:
+
+1. Enter a descriptive name identifying the consuming system.
+2. Select `inventory:read`.
+3. Select **Create token**.
+4. Copy the complete token from the confirmation dialog and save it in the consumer's secret store.
+5. Close the dialog only after the token has been saved.
+
+The complete token is shown exactly once. Task Central stores only a hash and cannot recover a lost
+token. If a token is lost, exposed, or no longer needed, select **Revoke**, confirm revocation, and
+create a replacement when necessary. Revocation takes effect immediately and cannot be undone.
+
 ### Data Management
 
 - Export all data as JSON
@@ -1835,7 +1853,156 @@ POST /api/v1/changelog/current/seen
 The `POST` endpoint records only the running version. It does not alter inventory or user
 configuration.
 
-## API access
+## Read-only Integration API
+
+The Integration API lets automation platforms, dashboards, documentation systems, monitoring
+tools, and custom applications read Task Central inventory without receiving the user's browser
+session. n8n is one possible generic consumer, but the API is not tied to n8n or any other product.
+
+### Security model
+
+- Integration credentials are separate from browser sessions.
+- Every endpoint under `/api/v1/integrations` requires a Bearer token with `inventory:read`.
+- Integration tokens cannot authenticate existing application APIs, Settings, imports, exports,
+  backups, setup, administrative operations, or any write endpoint.
+- Tokens are generated with at least 256 bits of entropy in the recognizable format
+  `tcint_<prefix>_<secret>`.
+- The unique 12-character hexadecimal prefix is stored for indexed lookup. Only a SHA-256 hash of
+  the complete token is stored, and hash verification uses a timing-safe comparison.
+- Token hashes, browser sessions, credentials, settings, and unrelated secrets are never returned
+  by integration responses.
+- Last-used time is updated no more than once every 15 minutes to avoid unnecessary SQLite writes.
+- Authentication failures return `401` with `WWW-Authenticate: Bearer`; a valid token missing the
+  required scope returns `403`.
+
+Use a separate token for each consumer so one integration can be revoked without disrupting
+another. Treat the token like a password. Do not place it in a URL, source repository, workflow
+output, support ticket, screenshot, or prompt. Use HTTPS whenever requests cross an untrusted
+network.
+
+### Creating and managing tokens
+
+Use **Settings → Integration API** for normal management. The list never displays a complete token
+or token hash. Revoked records remain visible as an audit record and cannot be reactivated.
+
+Equivalent CLI commands are:
+
+```bash
+docker compose exec backend python -m app.cli integration-token create \
+  --name automation --scope inventory:read
+docker compose exec backend python -m app.cli integration-token list
+docker compose exec backend python -m app.cli integration-token revoke TOKEN_ID_OR_PREFIX
+```
+
+Release-bundle installations may need their explicit Compose arguments:
+
+```bash
+docker compose --env-file .env -f compose.yml exec backend \
+  python -m app.cli integration-token create --name automation --scope inventory:read
+```
+
+Creation prints the complete token once. Listing prints only metadata. Revocation accepts the
+numeric ID or an unambiguous displayed prefix; at least four prefix characters are required.
+Revoking an already revoked token is safe and leaves it revoked.
+
+### Bearer authentication
+
+Set the HTTP `Authorization` header on every integration request:
+
+```text
+Authorization: Bearer YOUR_INTEGRATION_TOKEN
+```
+
+Test authentication and retrieve the running version:
+
+```bash
+curl -sS \
+  -H 'Authorization: Bearer YOUR_INTEGRATION_TOKEN' \
+  http://TASKCENTRAL_HOST:8484/api/v1/integrations/health
+```
+
+Never pass the token as a query parameter. In n8n or another automation platform, store the token
+as a protected credential and configure an HTTP request node to send it as a Bearer Authorization
+header.
+
+### Integration endpoints
+
+| Method and path | Response |
+|---|---|
+| `GET /api/v1/integrations/health` | Authentication check, Integration API state, and running version |
+| `GET /api/v1/integrations/machines/{machine_id}/context` | Machine fields, tags, hosted services, direct dependencies, and direct dependents |
+| `GET /api/v1/integrations/machines/{machine_id}/services` | Stable object containing the machine ID and its services |
+| `GET /api/v1/integrations/services/{service_id}/context` | Service, hosting machine, and that machine's direct dependencies and dependents |
+| `GET /api/v1/integrations/services/lookup?machine_id={id}&name={name}` | Exact service-name lookup within one required machine ID |
+
+Machine context includes stored identity, type, status, archived state, purpose, IP and MAC
+addresses, DNS record, operating system, architecture, VMID, host, hypervisor, CPU, memory, disk,
+storage location, network interface, location, and tags. Optional values are `null` when they are
+not stored. Responses never invent values.
+
+Dependency entries include the relationship type and notes. Tracked targets include their ID,
+name, type, state, purpose, IP address, DNS record, operating system, and other identifying fields.
+External dependencies contain the stored external name, relationship type, and notes. Dependents
+identify the tracked machine that points to the requested machine. Expansion stops after this one
+relationship level and never recursively walks the inventory graph.
+
+Service lookup uses a case-insensitive exact name match. It does not use fuzzy or partial matching.
+It returns `404` when no service matches, `409` if duplicate stored names make the result ambiguous,
+and `422` for invalid input.
+
+Examples using placeholders:
+
+```bash
+# Machine context
+curl -sS -H 'Authorization: Bearer YOUR_INTEGRATION_TOKEN' \
+  http://TASKCENTRAL_HOST:8484/api/v1/integrations/machines/MACHINE_ID/context
+
+# Services hosted by a machine
+curl -sS -H 'Authorization: Bearer YOUR_INTEGRATION_TOKEN' \
+  http://TASKCENTRAL_HOST:8484/api/v1/integrations/machines/MACHINE_ID/services
+
+# Service context
+curl -sS -H 'Authorization: Bearer YOUR_INTEGRATION_TOKEN' \
+  http://TASKCENTRAL_HOST:8484/api/v1/integrations/services/SERVICE_ID/context
+
+# Exact service lookup; curl safely URL-encodes the name
+curl -sS -G -H 'Authorization: Bearer YOUR_INTEGRATION_TOKEN' \
+  --data-urlencode 'machine_id=MACHINE_ID' \
+  --data-urlencode 'name=SERVICE_NAME' \
+  http://TASKCENTRAL_HOST:8484/api/v1/integrations/services/lookup
+```
+
+### Archived records
+
+Direct lookup by a known machine ID or by the ID of a service hosted on that machine can return an
+archived machine. The response sets `archived` to `true`, includes `archived_at`, and reports the
+stored status. Archived dependencies and dependents are likewise clearly marked in their machine
+summaries. Hard-deleted machines and their cascade-deleted services return `404`.
+
+### Rotation, loss, backups, and imports
+
+To rotate a credential, create a replacement, update the consumer, verify the replacement through
+the integration health endpoint, and then revoke the old token. A lost token cannot be recovered.
+
+Portable JSON exports never include integration-token records, plaintext tokens, prefixes, or
+hashes. JSON import leaves the current installation's integration credentials in place. A raw
+SQLite backup naturally includes token hashes and metadata, but never plaintext tokens; protect
+database backups because hashes and inventory remain sensitive. Factory reset deletes every
+integration token.
+
+### Current limitations
+
+- The only scope is `inventory:read`.
+- The API is read-only and does not expose create, update, archive, delete, backup, or settings
+  operations.
+- Reads are by known machine/service ID, or exact service name plus machine ID. There is no broad
+  search, fuzzy lookup, arbitrary filtering, field selection, or pagination in this phase.
+- Relationship expansion is limited to one level.
+- There are no per-token IP restrictions, expiration dates, or rate limits.
+- Task Central remains a single-user homelab application. Network controls and HTTPS remain the
+  administrator's responsibility.
+
+## Browser-session API access
 
 The REST API is under `/api/v1`. Docker-hosted interactive documentation is available at:
 
@@ -1845,7 +2012,7 @@ http://localhost:8484/api/docs
 
 The OpenAPI document is at `/api/openapi.json`.
 
-### Authenticating
+### Authenticating a browser API client
 
 Login and save the returned cookie in a temporary cookie jar:
 
@@ -1890,6 +2057,8 @@ Delete the temporary cookie jar when finished and never attach it to tickets, no
 | `/reminder-templates` | Reminder defaults |
 | `/obsidian-templates` | Per-type templates, preview, variables, and reset |
 | `/settings` | Application settings plus Telegram and local-AI connection tests |
+| `/settings/integration-tokens` | Browser-session-protected integration-token management |
+| `/integrations` | Bearer-token-protected read-only inventory context API |
 | `/data` | JSON export/import, SQLite backup, and sample-data removal |
 
 Use the OpenAPI documentation for exact request and response schemas.

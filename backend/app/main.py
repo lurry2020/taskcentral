@@ -115,6 +115,7 @@ async def require_authentication(request: Request, call_next):
         request.method == "OPTIONS"
         or not path.startswith("/api/v1/")
         or path in AUTH_EXEMPT_PATHS
+        or path.startswith("/api/v1/integrations/")
     ):
         return await call_next(request)
     token = request.cookies.get(SESSION_COOKIE_NAME)

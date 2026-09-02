@@ -38,6 +38,9 @@ one-click Obsidian-ready Markdown document for your vault.
   Online or Offline with manual refresh, hover details, and periodic checks.
 - **Version-aware changelog** - after an update, the Dashboard shows the current release notes
   once automatically; the sidebar Changelog button reopens them at any time.
+- **Read-only Integration API** - create scoped, revocable tokens for automation platforms,
+  dashboards, monitoring tools, documentation systems, and custom applications without sharing
+  the browser session.
 
 ## Technology stack
 
@@ -119,6 +122,34 @@ and enter that code on the one-time `/setup` wizard.
 
 Release images support Linux `amd64` and `arm64`. Users do not need Git, Python, Node.js, or a
 local compiler.
+
+## Read-only Integration API
+
+Create and revoke dedicated tokens under **Settings → Integration API**. Integration tokens are
+separate from browser sessions, are shown only once, and currently support only the
+`inventory:read` scope. They can call the read-only `/api/v1/integrations/*` endpoints but cannot
+authenticate normal application, settings, data-management, or write APIs.
+
+Create a token from the CLI if preferred:
+
+```bash
+docker compose exec backend python -m app.cli integration-token create \
+  --name automation --scope inventory:read
+docker compose exec backend python -m app.cli integration-token list
+docker compose exec backend python -m app.cli integration-token revoke TOKEN_ID_OR_PREFIX
+```
+
+Use the one-time token as a Bearer credential:
+
+```bash
+curl -sS \
+  -H 'Authorization: Bearer YOUR_INTEGRATION_TOKEN' \
+  http://localhost:8484/api/v1/integrations/health
+```
+
+Available reads include machine context, a machine's services, service context, and exact
+case-insensitive service lookup within a required machine ID. See [MANUAL.md](MANUAL.md) and
+`/api/docs` for endpoint schemas, archived-record behavior, rotation guidance, and examples.
 
 ### Updates and maintenance
 
@@ -235,7 +266,7 @@ cd frontend && npm run build                       # production build
 | `APP_NAME`     | `Task Central`                   | Display name (also editable in Settings)        |
 | `APP_ENV`      | `production`                     | Environment label                               |
 | `APP_PORT`     | `8484`                           | Host port for the web UI                        |
-| `TASKCENTRAL_VERSION` | `1.1.6`                    | Installed application release                   |
+| `TASKCENTRAL_VERSION` | `1.2.0`                    | Installed application release                   |
 | `TASKCENTRAL_RELEASE_REPOSITORY` | `lurry2020/taskcentral` | Repository used to check for releases   |
 | `DATABASE_URL` | `sqlite:////data/taskcentral.db` | SQLAlchemy connection string                    |
 | `CORS_ORIGINS` | `http://localhost:8484`          | Comma-separated allowed origins                 |

@@ -10,7 +10,13 @@ from app.models.machine import (
     Tag,
     machine_tags,
 )
-from app.models.misc import ActivityEvent, ApplicationSetting, AuthSession, GeneratedDocument
+from app.models.misc import (
+    ActivityEvent,
+    ApplicationSetting,
+    AuthSession,
+    GeneratedDocument,
+    IntegrationToken,
+)
 from app.models.reminder import MachineReminder, ReminderTemplate
 from app.models.task import MachineTask, TaskTemplate
 from app.models.template import ObsidianTemplate
@@ -35,4 +41,5 @@ __all__ = [
     "ActivityEvent",
     "ApplicationSetting",
     "AuthSession",
+    "IntegrationToken",
 ]
