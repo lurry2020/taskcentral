@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -167,6 +167,17 @@ def integration_health():
         integration_api=True,
         version=get_settings().taskcentral_version,
     )
+
+
+@router.get("/machines", response_model=list[IntegrationMachineSummary])
+def list_machines(db: Session = Depends(get_db)):
+    """Return the current, non-archived machine inventory in stable name order."""
+    machines = db.scalars(
+        select(Machine)
+        .where(Machine.archived_at.is_(None))
+        .order_by(func.lower(Machine.name), Machine.id)
+    ).all()
+    return [_machine_summary(machine) for machine in machines]
 
 
 @router.get("/machines/{machine_id}/context", response_model=MachineContext)
