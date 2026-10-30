@@ -7,6 +7,12 @@ displays the running version and every older release in newest-first order.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-30
+
+### Added
+
+- Added an authenticated, read-only machine collection endpoint for inventory integrations.
+
 ## [1.2.0] - 2026-09-02
 
 ### Added
