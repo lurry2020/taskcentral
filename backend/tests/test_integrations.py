@@ -133,6 +133,58 @@ def test_integration_token_cannot_authenticate_existing_or_management_apis(clien
     assert client.get("/api/v1/settings").status_code == 200
 
 
+def test_machine_list_returns_current_inventory_in_stable_name_order(client, machine):
+    zulu = client.post(
+        "/api/v1/machines",
+        json={
+            "name": "Zulu host",
+            "machine_type": "HOST",
+            "status": "Active",
+            "ip_address": "192.168.1.70",
+        },
+    ).json()
+    alpha = client.post(
+        "/api/v1/machines",
+        json={
+            "name": "alpha appliance",
+            "machine_type": "PHYSICAL",
+            "status": "Maintenance",
+            "dns_record": "alpha.example.test",
+        },
+    ).json()
+    archived = client.post(
+        "/api/v1/machines",
+        json={
+            "name": "Archived machine",
+            "machine_type": "LXC",
+            "status": "Active",
+        },
+    ).json()
+    assert client.post(f"/api/v1/machines/{archived['id']}/archive").status_code == 200
+    created = _create_token(client)
+
+    with TestClient(app) as integration_client:
+        response = integration_client.get(
+            "/api/v1/integrations/machines",
+            headers=_headers(created["token"]),
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["id"] for item in payload] == [alpha["id"], machine["id"], zulu["id"]]
+    assert [item["name"] for item in payload] == [
+        "alpha appliance",
+        "test-vm-01",
+        "Zulu host",
+    ]
+    assert all(item["archived"] is False for item in payload)
+    assert payload[0]["machine_type"] == "PHYSICAL"
+    assert payload[0]["status"] == "Maintenance"
+    assert payload[0]["dns_record"] == "alpha.example.test"
+    assert payload[2]["ip_address"] == "192.168.1.70"
+    assert archived["id"] not in {item["id"] for item in payload}
+
+
 def test_machine_and_service_context_include_one_level_relationships(client, machine):
     dependency = client.post(
         "/api/v1/machines",
